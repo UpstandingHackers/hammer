@@ -28,12 +28,12 @@ const HParser* h_ch_range(const uint8_t lower, const uint8_t upper) {
 }
 
 
-const HParser* h_not_in(const uint8_t *options, int count) {
+const HParser* h_not_in(const uint8_t *options, size_t count) {
   HParser *ret = g_new(HParser, 1);
   HCharset cs = new_charset();
-  for (int i = 0; i < 256; i++)
+  for (size_t i = 0; i < 256; i++)
     charset_set(cs, i, 1);
-  for (int i = 0; i < count; i++)
+  for (size_t i = 0; i < count; i++)
     charset_set(cs, options[i], 0);
 
   ret->vtable = &charset_vt;
