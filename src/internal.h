@@ -108,6 +108,12 @@ typedef struct HLeftRec_ {
   HRecursionHead *head;
 } HLeftRec;
 
+/* Result and remaining input, for rerunning from a cached position. */
+typedef struct HCachedResult_ {
+  HParseResult *result;
+  HInputStream input_stream;
+} HCachedResult;
+
 /* Tagged union for values in the cache: either HLeftRec's (Left) or 
  * HParseResult's (Right).
  */
@@ -115,7 +121,7 @@ typedef struct HParserCacheValue_t {
   HParserCacheValueType value_type;
   union {
     HLeftRec *left;
-    HParseResult *right;
+    HCachedResult *right;
   };
 } HParserCacheValue;
 
