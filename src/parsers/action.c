@@ -10,8 +10,11 @@ static HParseResult* parse_action(void *env, HParseState *state) {
   if (a->p && a->action) {
     HParseResult *tmp = h_do_parse(a->p, state);
     //HParsedToken *tok = a->action(h_do_parse(a->p, state));
-    const HParsedToken *tok = a->action(tmp);
-    return make_result(state, (HParsedToken*)tok);
+    if(tmp) {
+        const HParsedToken *tok = a->action(tmp);
+        return make_result(state, (HParsedToken*)tok);
+    } else
+      return NULL;
   } else // either the parser's missing or the action's missing
     return NULL;
 }

@@ -426,6 +426,7 @@ static void test_action(void) {
   
   g_check_parse_ok(action_, "ab", 2, "(u0x41 u0x42)");
   g_check_parse_ok(action_, "AB", 2, "(u0x41 u0x42)");
+  g_check_parse_failed(action_, "XX", 2);
 }
 
 static void test_not_in(void) {
