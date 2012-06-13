@@ -217,6 +217,30 @@ const HParser* h_uint8();
 const HParser* h_whitespace(const HParser* p);
 
 /**
+ * Given two parsers, p and q, returns a parser that parses them in
+ * sequence but only returns p's result.
+ *
+ * Result token type: p's result type
+ */
+const HParser* h_left(const HParser* p, const HParser* q);
+
+/**
+ * Given two parsers, p and q, returns a parser that parses them in
+ * sequence but only returns q's result.
+ *
+ * Result token type: q's result type
+ */
+const HParser* h_right(const HParser* p, const HParser* q);
+
+/**
+ * Given three parsers, p, x, and q, returns a parser that parses them in
+ * sequence but only returns x's result.
+ *
+ * Result token type: x's result type
+ */
+const HParser* h_middle(const HParser* p, const HParser* x, const HParser* q);
+
+/**
  * Given another parser, p, and a function f, returns a parser that 
  * applies p, then applies f to everything in the AST of p's result. 
  *

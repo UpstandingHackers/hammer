@@ -4,6 +4,7 @@ PARSERS := \
 	bits \
 	token \
 	whitespace \
+	ignoreseq \
 	ch \
 	action \
 	charset \

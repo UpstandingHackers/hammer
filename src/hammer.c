@@ -380,6 +380,37 @@ static void test_whitespace(void) {
   g_check_parse_failed(whitespace_, "_a", 2);
 }
 
+static void test_left(void) {
+  const HParser *left_ = h_left(h_ch('a'), h_ch(' '));
+
+  g_check_parse_ok(left_, "a ", 2, "u0x61");
+  g_check_parse_failed(left_, "a", 1);
+  g_check_parse_failed(left_, " ", 1);
+  g_check_parse_failed(left_, "ab", 2);
+}
+
+static void test_right(void) {
+  const HParser *right_ = h_right(h_ch(' '), h_ch('a'));
+
+  g_check_parse_ok(right_, " a", 2, "u0x61");
+  g_check_parse_failed(right_, "a", 1);
+  g_check_parse_failed(right_, " ", 1);
+  g_check_parse_failed(right_, "ba", 2);
+}
+
+static void test_middle(void) {
+  const HParser *middle_ = h_middle(h_ch(' '), h_ch('a'), h_ch(' '));
+
+  g_check_parse_ok(middle_, " a ", 3, "u0x61");
+  g_check_parse_failed(middle_, "a", 1);
+  g_check_parse_failed(middle_, " ", 1);
+  g_check_parse_failed(middle_, " a", 2);
+  g_check_parse_failed(middle_, "a ", 2);
+  g_check_parse_failed(middle_, " b ", 3);
+  g_check_parse_failed(middle_, "ba ", 3);
+  g_check_parse_failed(middle_, " ab", 3);
+}
+
 #include <ctype.h>
 
 const HParsedToken* upcase(const HParseResult *p) {
@@ -601,6 +632,9 @@ void register_parser_tests(void) {
   g_test_add_func("/core/parser/float32", test_float32);
 #endif
   g_test_add_func("/core/parser/whitespace", test_whitespace);
+  g_test_add_func("/core/parser/left", test_left);
+  g_test_add_func("/core/parser/right", test_right);
+  g_test_add_func("/core/parser/middle", test_middle);
   g_test_add_func("/core/parser/action", test_action);
   g_test_add_func("/core/parser/not_in", test_not_in);
   g_test_add_func("/core/parser/end_p", test_end_p);
