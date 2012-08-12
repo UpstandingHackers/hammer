@@ -223,12 +223,43 @@ const HParser* h_uint8();
 const HParser* h_whitespace(const HParser* p);
 
 /**
+ * Given two parsers, p and q, returns a parser that parses them in
+ * sequence but only returns p's result.
+ *
+ * Result token type: p's result type
+ */
+const HParser* h_left(const HParser* p, const HParser* q);
+
+/**
+ * Given two parsers, p and q, returns a parser that parses them in
+ * sequence but only returns q's result.
+ *
+ * Result token type: q's result type
+ */
+const HParser* h_right(const HParser* p, const HParser* q);
+
+/**
+ * Given three parsers, p, x, and q, returns a parser that parses them in
+ * sequence but only returns x's result.
+ *
+ * Result token type: x's result type
+ */
+const HParser* h_middle(const HParser* p, const HParser* x, const HParser* q);
+
+/**
  * Given another parser, p, and a function f, returns a parser that 
  * applies p, then applies f to everything in the AST of p's result. 
  *
  * Result token type: any
  */
 const HParser* h_action(const HParser* p, const HAction a);
+
+/**
+ * Parse a single character in the given charset. 
+ *
+ * Result token type: TT_UINT
+ */
+const HParser* h_in(const uint8_t *charset, size_t length);
 
 /**
  * Parse a single character *NOT* in the given charset. 
@@ -441,7 +472,7 @@ HParser *h_indirect();
  * Set the inner parser of an indirect. See comments on indirect for 
  * details.
  */
-void h_bind_indirect(HParser* indirect, HParser* inner);
+void h_bind_indirect(HParser* indirect, const HParser* inner);
 
 /**
  * Free the memory allocated to an HParseResult when it is no longer needed.

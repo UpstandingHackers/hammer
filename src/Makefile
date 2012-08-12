@@ -4,6 +4,7 @@ PARSERS := \
 	bits \
 	token \
 	whitespace \
+	ignoreseq \
 	ch \
 	action \
 	charset \
@@ -21,7 +22,8 @@ PARSERS := \
 	epsilon \
 	and \
 	not \
-	attr_bool
+	attr_bool \
+	indirect
 
 OUTPUTS := bitreader.o \
 	   hammer.o \
