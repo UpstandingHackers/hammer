@@ -1,4 +1,4 @@
-#include <malloc.h>
+#include <stdlib.h>
 #include "internal.h"
 
 static void* system_alloc(HAllocator *allocator, size_t size) {

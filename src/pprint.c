@@ -20,7 +20,7 @@
 #include <string.h>
 #include "hammer.h"
 #include "internal.h"
-#include <malloc.h>
+#include <stdlib.h>
 
 typedef struct pp_state {
   int delta;

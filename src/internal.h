@@ -223,7 +223,7 @@ void  h_hashtable_del(HHashTable* ht, void* key);
 void  h_hashtable_free(HHashTable* ht);
 
 #if 0
-#include <malloc.h>
+#include <stdlib.h>
 #define h_arena_malloc(a, s) malloc(s)
 #endif
 
