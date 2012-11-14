@@ -31,7 +31,6 @@ Installing
 * make
 
 ### Optional Dependencies
-* doxygen (for `make doc`)
 * pkg-config (for `make test`)
 * glib-2.0 (>= 2.29) (for `make test`)
 * glib-2.0-dev (for `make test`)
