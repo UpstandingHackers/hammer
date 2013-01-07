@@ -43,9 +43,8 @@ typedef enum HTokenType_ {
   TT_SINT,
   TT_UINT,
   TT_SEQUENCE,
-  TT_USER = 64,
   TT_ERR,
-  TT_MAX
+  TT_USER = 64
 } HTokenType;
 
 typedef struct HCountedArray_ {
