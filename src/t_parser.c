@@ -110,12 +110,17 @@ static void test_float32(void) {
 
 static void test_whitespace(void) {
   const HParser *whitespace_ = h_whitespace(h_ch('a'));
+  const HParser *whitespace_end = h_whitespace(h_end_p());
 
   g_check_parse_ok(whitespace_, "a", 1, "u0x61");
   g_check_parse_ok(whitespace_, " a", 2, "u0x61");
   g_check_parse_ok(whitespace_, "  a", 3, "u0x61");
   g_check_parse_ok(whitespace_, "\ta", 2, "u0x61");
   g_check_parse_failed(whitespace_, "_a", 2);
+
+  g_check_parse_ok(whitespace_end, "", 0, "NULL");
+  g_check_parse_ok(whitespace_end, "  ", 2, "NULL");
+  g_check_parse_failed(whitespace_end, "  x", 3);
 }
 
 static void test_left(void) {
