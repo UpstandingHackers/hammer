@@ -209,6 +209,7 @@ HCountedArray *h_carray_new(HArena * arena);
 void h_carray_append(HCountedArray *array, void* item);
 
 HSlist* h_slist_new(HArena *arena);
+HSlist* h_slist_copy(HSlist *slist);
 void* h_slist_pop(HSlist *slist);
 void h_slist_push(HSlist *slist, void* item);
 bool h_slist_find(HSlist *slist, const void* item);
