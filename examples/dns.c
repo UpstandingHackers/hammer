@@ -10,7 +10,12 @@
 #define false 0
 #define true 1
 
-bool is_zero(HParseResult *p) {
+
+///
+// Validations
+///
+
+bool validate_hdzero(HParseResult *p) {
   if (TT_UINT != p->ast->token_type)
     return false;
   return (0 == p->ast->uint);
@@ -20,407 +25,243 @@ bool is_zero(HParseResult *p) {
  * Every DNS message should have QDCOUNT entries in the question
  * section, and ANCOUNT+NSCOUNT+ARCOUNT resource records.
  */
-bool validate_dns(HParseResult *p) {
+bool validate_message(HParseResult *p) {
   if (TT_SEQUENCE != p->ast->token_type)
     return false;
-  // The header holds the counts as its last 4 elements.
-  HParsedToken **elems = p->ast->seq->elements[0]->seq->elements;
-  size_t qd = elems[8]->uint;
-  size_t an = elems[9]->uint;
-  size_t ns = elems[10]->uint;
-  size_t ar = elems[11]->uint;
-  HParsedToken *questions = p->ast->seq->elements[1];
-  if (questions->seq->used != qd)
+
+  dns_header_t *header = H_FIELD(dns_header_t, 0);
+  size_t qd = header->question_count;
+  size_t an = header->answer_count;
+  size_t ns = header->authority_count;
+  size_t ar = header->additional_count;
+
+  if (H_FIELD_SEQ(1)->used != qd)
     return false;
-  HParsedToken *rrs = p->ast->seq->elements[2];
-  if (an+ns+ar != rrs->seq->used)
+  if (an+ns+ar != H_FIELD_SEQ(2)->used)
     return false;
+
   return true;
 }
 
-struct dns_qname get_qname(const HParsedToken *t) {
-  // The qname parser parses at least 1 length-value pair, then a NULL.
-  // So, t->seq->elements[0] is a sequence of at least 1 such pair,
-  // and t->seq->elements[1] is the null.
-  const HParsedToken *labels = t->seq->elements[0];
-  struct dns_qname ret = {
-    .qlen = labels->seq->used,
-    .labels = h_arena_malloc(t->seq->arena, sizeof(*ret.labels)*labels->seq->used)
-  };
-  // i is which label we're on
-  for (size_t i=0; i<labels->seq->used; ++i) {
-    ret.labels[i].len = labels->seq->elements[i]->seq->used;
-    ret.labels[i].label = h_arena_malloc(t->seq->arena, ret.labels[i].len + 1);
-    // j is which char of the label we're on
-    for (size_t j=0; j<ret.labels[i].len; ++j)
-      ret.labels[i].label[j] = labels->seq->elements[i]->seq->elements[j]->uint;
-    ret.labels[i].label[ret.labels[i].len] = 0;
-  }
-  return ret;
-}
 
-char* get_domain(const HParsedToken *t) {
-  switch(t->token_type) {
-  case TT_UINT:
-    return " ";
-  case TT_SEQUENCE:
-    {
-      // Sequence of subdomains separated by "."
-      // Each subdomain is a label, which can be no more than 63 chars.
-      char *ret = h_arena_malloc(t->seq->arena, 64*t->seq->used);
-      size_t count = 0;
-      for (size_t i=0; i<t->seq->used; ++i) {
-	HParsedToken *tmp = t->seq->elements[i];
-	for (size_t j=0; j<tmp->seq->used; ++j) {
-	  ret[count] = tmp->seq->elements[i]->uint;
-	  ++count;
-	}
-	ret[count] = '.';
-	++count;
-      }
-      ret[count-1] = '\x00';
-      return ret;
-    }
-  default:
-    return NULL;
-  }
-}
+///
+// Semantic Actions
+///
 
-uint8_t* get_cs(const HCountedArray *arr) {
-  uint8_t *ret = h_arena_malloc(arr->arena, sizeof(uint8_t)*arr->used);
-  for (size_t i=0; i<arr->used; ++i)
-    ret[i] = arr->elements[i]->uint;
-  return ret;
-}
-
-uint8_t** get_txt(const HCountedArray *arr) {
-  uint8_t **ret = h_arena_malloc(arr->arena, sizeof(uint8_t*)*arr->used);
-  for (size_t i=0; i<arr->used; ++i) {
-    uint8_t *tmp = h_arena_malloc(arr->arena, sizeof(uint8_t)*arr->elements[i]->seq->used);
-    for (size_t j=0; j<arr->elements[i]->seq->used; ++j)
-      tmp[j] = arr->elements[i]->seq->elements[j]->uint;
-  }
-  return ret;
-}
-
-void set_rr(struct dns_rr rr, HCountedArray *rdata) {
+// Helper: Parse and pack the RDATA field of a Resource Record.
+void set_rdata(struct dns_rr rr, HCountedArray *rdata) {
   uint8_t *data = h_arena_malloc(rdata->arena, sizeof(uint8_t)*rdata->used);
   for (size_t i=0; i<rdata->used; ++i)
-    data[i] = rdata->elements[i]->uint;
+    data[i] = H_CAST_UINT(rdata->elements[i]);
+
+  // Parse RDATA if possible.
+  const HParseResult *p = NULL;
+  const HParser *parser = init_rdata(rr.type);
+  if (parser)
+    p = h_parse(parser, (const uint8_t*)data, rdata->used);
 
   // If the RR doesn't parse, set its type to 0.
+  if (!p) 
+    rr.type = 0;
+
+  // Pack the parsed rdata into rr.
   switch(rr.type) {
-  case 1: // A
-    {
-      const HParseResult *r = h_parse(init_a(), (const uint8_t*)data, rdata->used);
-      if (!r) 
-	rr.type = 0;
-      else 
-	rr.a = r->ast->seq->elements[0]->uint;
-      break;
-    }
-  case 2: // NS
-    {
-      const HParseResult *r = h_parse(init_ns(), (const uint8_t*)data, rdata->used);
-      if (!r)
-	rr.type = 0;
-      else
-	rr.ns = get_domain(r->ast->seq->elements[0]);
-      break;
-    }
-  case 3: // MD
-    {
-      const HParseResult *r = h_parse(init_md(), (const uint8_t*)data, rdata->used);
-      if (!r)
-	rr.type = 0;
-      else
-	rr.md = get_domain(r->ast->seq->elements[0]);
-      break;
-    }
-  case 4: // MF
-    {
-      const HParseResult *r = h_parse(init_mf(), (const uint8_t*)data, rdata->used);
-      if (!r)
-	rr.type = 0;
-      else
-	rr.md = get_domain(r->ast->seq->elements[0]);
-      break;
-    }
-  case 5: // CNAME
-    {
-      const HParseResult *r = h_parse(init_cname(), (const uint8_t*)data, rdata->used);
-      if (!r)
-	rr.type = 0;
-      else
-	rr.cname = get_domain(r->ast->seq->elements[0]);
-      break;
-    }
-  case 6: // SOA
-    {
-      const HParseResult *r = h_parse(init_soa(), (const uint8_t*)data, rdata->used);
-      if (!r)
-	rr.type = 0;
-      else {
-	rr.soa.mname = get_domain(r->ast->seq->elements[0]);
-	rr.soa.rname = get_domain(r->ast->seq->elements[1]);
-	rr.soa.serial = r->ast->seq->elements[2]->uint;
-	rr.soa.refresh = r->ast->seq->elements[3]->uint;
-	rr.soa.retry = r->ast->seq->elements[4]->uint;
-	rr.soa.expire = r->ast->seq->elements[5]->uint;
-	rr.soa.minimum = r->ast->seq->elements[6]->uint;
-      }
-      break;
-    }
-  case 7: // MB
-    {
-      const HParseResult *r = h_parse(init_mb(), (const uint8_t*)data, rdata->used);
-      if (!r)
-	rr.type = 0;
-      else
-	rr.mb = get_domain(r->ast->seq->elements[0]);
-      break;
-    }
-  case 8: // MG
-    {
-      const HParseResult *r = h_parse(init_mg(), (const uint8_t*)data, rdata->used);
-      if (!r)
-	rr.type = 0;
-      else
-	rr.mg = get_domain(r->ast->seq->elements[0]);
-      break;
-    }
-  case 9: // MR
-    {
-      const HParseResult *r = h_parse(init_mr(), (const uint8_t*)data, rdata->used);
-      if (!r)
-	rr.type = 0;
-      else
-	rr.mr = get_domain(r->ast->seq->elements[0]);
-      break;
-    }
-  case 10: // NULL
-    {
-      const HParseResult *r = h_parse(init_null(), (const uint8_t*)data, rdata->used);
-      if (!r)
-	rr.type = 0;
-      else {
-	rr.null = h_arena_malloc(rdata->arena, sizeof(uint8_t)*r->ast->seq->used);
-	for (size_t i=0; i<r->ast->seq->used; ++i)
-	  rr.null[i] = r->ast->seq->elements[i]->uint;
-      }
-      break;
-    }
-  case 11: // WKS
-    {
-      const HParseResult *r = h_parse(init_wks(), (const uint8_t*)data, rdata->used);
-      if (!r)
-	rr.type = 0;
-      else {
-	rr.wks.address = r->ast->seq->elements[0]->uint;
-	rr.wks.protocol = r->ast->seq->elements[1]->uint;
-	rr.wks.len = r->ast->seq->elements[2]->seq->used;
-	rr.wks.bit_map = h_arena_malloc(rdata->arena, sizeof(uint8_t)*r->ast->seq->elements[2]->seq->used);
-	for (size_t i=0; i<rr.wks.len; ++i)
-	  rr.wks.bit_map[i] = r->ast->seq->elements[2]->seq->elements[i]->uint;
-      }
-      break;
-    }
-  case 12: // PTR
-    {
-      const HParseResult *r = h_parse(init_ptr(), (const uint8_t*)data, rdata->used);
-      if (!r)
-	rr.type = 0;
-      else
-	rr.ptr = get_domain(r->ast->seq->elements[0]);
-      break;
-    }
-  case 13: // HINFO
-    {
-      const HParseResult *r = h_parse(init_hinfo(), (const uint8_t*)data, rdata->used);
-      if (!r)
-	rr.type = 0;
-      else {
-	rr.hinfo.cpu = get_cs(r->ast->seq->elements[0]->seq);
-	rr.hinfo.os = get_cs(r->ast->seq->elements[1]->seq);
-      }
-      break;
-    }
-  case 14: // MINFO
-    {
-      const HParseResult *r = h_parse(init_minfo(), (const uint8_t*)data, rdata->used);
-      if (!r)
-	rr.type = 0;
-      else {
-	rr.minfo.rmailbx = get_domain(r->ast->seq->elements[0]);
-	rr.minfo.emailbx = get_domain(r->ast->seq->elements[1]);
-      }
-      break;
-    }
-  case 15: // MX
-    {
-      const HParseResult *r = h_parse(init_mx(), (const uint8_t*)data, rdata->used);
-      if (!r)
-	rr.type = 0;
-      else {
-	rr.mx.preference = r->ast->seq->elements[0]->uint;
-	rr.mx.exchange = get_domain(r->ast->seq->elements[1]);
-      }
-      break;
-    }
-  case 16: // TXT
-    {
-      const HParseResult *r = h_parse(init_txt(), (const uint8_t*)data, rdata->used);
-      if (!r)
-	rr.type = 0;
-      else {
-	rr.txt.count = r->ast->seq->elements[0]->seq->used;
-	rr.txt.txt_data = get_txt(r->ast->seq->elements[0]->seq);
-      }
-      break;
-    }
-  default:
-    break;
+  case 1:  rr.a     = H_CAST_UINT(p->ast);             break;
+  case 2:  rr.ns    = *H_CAST(dns_domain_t,   p->ast); break;
+  case 3:  rr.md    = *H_CAST(dns_domain_t,   p->ast); break;
+  case 4:  rr.md    = *H_CAST(dns_domain_t,   p->ast); break;
+  case 5:  rr.cname = *H_CAST(dns_domain_t,   p->ast); break;
+  case 6:  rr.soa   = *H_CAST(dns_rr_soa_t,   p->ast); break;
+  case 7:  rr.mb    = *H_CAST(dns_domain_t,   p->ast); break;
+  case 8:  rr.mg    = *H_CAST(dns_domain_t,   p->ast); break;
+  case 9:  rr.mr    = *H_CAST(dns_domain_t,   p->ast); break;
+  case 10: rr.null  = *H_CAST(dns_rr_null_t,  p->ast); break;
+  case 11: rr.wks   = *H_CAST(dns_rr_wks_t,   p->ast); break;
+  case 12: rr.ptr   = *H_CAST(dns_domain_t,   p->ast); break;
+  case 13: rr.hinfo = *H_CAST(dns_rr_hinfo_t, p->ast); break;
+  case 14: rr.minfo = *H_CAST(dns_rr_minfo_t, p->ast); break;
+  case 15: rr.mx    = *H_CAST(dns_rr_mx_t,    p->ast); break;
+  case 16: rr.txt   = *H_CAST(dns_rr_txt_t,   p->ast); break;
+  default:                                             break;
   }
 }
 
-const HParsedToken* pack_dns_struct(const HParseResult *p) {
-  h_pprint(stdout, p->ast, 0, 2);
-  HParsedToken *ret = h_arena_malloc(p->arena, sizeof(HParsedToken));
-  ret->token_type = TT_USER;
-
-  dns_message_t *msg = h_arena_malloc(p->arena, sizeof(dns_message_t));
-
-  HParsedToken *hdr = p->ast->seq->elements[0];
-  struct dns_header header = {
-    .id = hdr->seq->elements[0]->uint,
-    .qr = hdr->seq->elements[1]->uint,
-    .opcode = hdr->seq->elements[2]->uint,
-    .aa = hdr->seq->elements[3]->uint,
-    .tc = hdr->seq->elements[4]->uint,
-    .rd = hdr->seq->elements[5]->uint,
-    .ra = hdr->seq->elements[6]->uint,
-    .rcode = hdr->seq->elements[7]->uint,
-    .question_count = hdr->seq->elements[8]->uint,
-    .answer_count = hdr->seq->elements[9]->uint,
-    .authority_count = hdr->seq->elements[10]->uint,
-    .additional_count = hdr->seq->elements[11]->uint
+const HParsedToken* act_header(const HParseResult *p) {
+  HParsedToken **fields = h_seq_elements(p->ast);
+  dns_header_t header_ = {
+    .id     = H_CAST_UINT(fields[0]),
+    .qr     = H_CAST_UINT(fields[1]),
+    .opcode = H_CAST_UINT(fields[2]),
+    .aa     = H_CAST_UINT(fields[3]),
+    .tc     = H_CAST_UINT(fields[4]),
+    .rd     = H_CAST_UINT(fields[5]),
+    .ra     = H_CAST_UINT(fields[6]),
+    .rcode  = H_CAST_UINT(fields[7]),
+    .question_count   = H_CAST_UINT(fields[8]),
+    .answer_count     = H_CAST_UINT(fields[9]),
+    .authority_count  = H_CAST_UINT(fields[10]),
+    .additional_count = H_CAST_UINT(fields[11])
   };
-  msg->header = header;
 
-  HParsedToken *qs = p->ast->seq->elements[1];
+  dns_header_t *header = H_ALLOC(dns_header_t);
+  *header = header_;
+
+  return H_MAKE(dns_header_t, header);
+}
+
+const HParsedToken* act_label(const HParseResult *p) {
+  dns_label_t *r = H_ALLOC(dns_label_t);
+
+  r->len = h_seq_len(p->ast);
+  r->label = h_arena_malloc(p->arena, r->len + 1);
+  for (size_t i=0; i<r->len; ++i)
+    r->label[i] = H_FIELD_UINT(i);
+  r->label[r->len] = 0;
+
+  return H_MAKE(dns_label_t, r);
+}
+
+const HParsedToken* act_rr(const HParseResult *p) {
+  dns_rr_t *rr = H_ALLOC(dns_rr_t);
+
+  rr->name     = *H_FIELD(dns_domain_t, 0);
+  rr->type     = H_FIELD_UINT(1);
+  rr->class    = H_FIELD_UINT(2);
+  rr->ttl      = H_FIELD_UINT(3);
+  rr->rdlength = H_FIELD_SEQ(4)->used;
+
+  // Parse and pack RDATA.
+  set_rdata(*rr, H_FIELD_SEQ(4));
+
+  return H_MAKE(dns_rr_t, rr);
+}
+
+const HParsedToken* act_question(const HParseResult *p) {
+  dns_question_t *q = H_ALLOC(dns_question_t);
+  HParsedToken **fields = h_seq_elements(p->ast);
+
+  // QNAME is a sequence of labels. Pack them into an array.
+  q->qname.qlen   = h_seq_len(fields[0]);
+  q->qname.labels = h_arena_malloc(p->arena, sizeof(dns_label_t)*q->qname.qlen);
+  for(size_t i=0; i<q->qname.qlen; i++) {
+    q->qname.labels[i] = *H_INDEX(dns_label_t, fields[0], i);
+  }
+
+  q->qtype  = H_CAST_UINT(fields[1]);
+  q->qclass = H_CAST_UINT(fields[2]);
+
+  return H_MAKE(dns_question_t, q);
+}
+
+const HParsedToken* act_message(const HParseResult *p) {
+  h_pprint(stdout, p->ast, 0, 2);
+  dns_message_t *msg = H_ALLOC(dns_message_t);
+
+  // Copy header into message struct.
+  dns_header_t *header = H_FIELD(dns_header_t, 0);
+  msg->header = *header;
+
+  // Copy questions into message struct.
+  HParsedToken *qs = h_seq_index(p->ast, 1);
   struct dns_question *questions = h_arena_malloc(p->arena,
-						sizeof(struct dns_question)*(header.question_count));
-  for (size_t i=0; i<header.question_count; ++i) {
-    // QNAME is a sequence of labels. In the parser, it's defined as
-    // sequence(many1(length_value(...)), ch('\x00'), NULL).
-    questions[i].qname = get_qname(qs->seq->elements[i]->seq->elements[0]);
-    questions[i].qtype = qs->seq->elements[i]->seq->elements[1]->uint;
-    questions[i].qclass = qs->seq->elements[i]->seq->elements[2]->uint;
+						  sizeof(struct dns_question)*(header->question_count));
+  for (size_t i=0; i<header->question_count; ++i) {
+    questions[i] = *H_INDEX(dns_question_t, qs, i);
   }
   msg->questions = questions;
 
-  HParsedToken *rrs = p->ast->seq->elements[2];
+  // Copy answer RRs into message struct.
+  HParsedToken *rrs = h_seq_index(p->ast, 2);
   struct dns_rr *answers = h_arena_malloc(p->arena,
-					  sizeof(struct dns_rr)*(header.answer_count));
-  for (size_t i=0; i<header.answer_count; ++i) {
-    answers[i].name = get_domain(rrs[i].seq->elements[0]);
-    answers[i].type = rrs[i].seq->elements[1]->uint;
-    answers[i].class = rrs[i].seq->elements[2]->uint;
-    answers[i].ttl = rrs[i].seq->elements[3]->uint;
-    answers[i].rdlength = rrs[i].seq->elements[4]->seq->used;
-    set_rr(answers[i], rrs[i].seq->elements[4]->seq);	   
+					  sizeof(struct dns_rr)*(header->answer_count));
+  for (size_t i=0; i<header->answer_count; ++i) {
+    answers[i] = *H_INDEX(dns_rr_t, rrs, i);
   }
   msg->answers = answers;
 
+  // Copy authority RRs into message struct.
   struct dns_rr *authority = h_arena_malloc(p->arena,
-					  sizeof(struct dns_rr)*(header.authority_count));
-  for (size_t i=0, j=header.answer_count; i<header.authority_count; ++i, ++j) {
-    authority[i].name = get_domain(rrs[j].seq->elements[0]);
-    authority[i].type = rrs[j].seq->elements[1]->uint;
-    authority[i].class = rrs[j].seq->elements[2]->uint;
-    authority[i].ttl = rrs[j].seq->elements[3]->uint;
-    authority[i].rdlength = rrs[j].seq->elements[4]->seq->used;
-    set_rr(authority[i], rrs[j].seq->elements[4]->seq);
+					    sizeof(struct dns_rr)*(header->authority_count));
+  for (size_t i=0, j=header->answer_count; i<header->authority_count; ++i, ++j) {
+    authority[i] = *H_INDEX(dns_rr_t, rrs, j);
   }
   msg->authority = authority;
 
+  // Copy additional RRs into message struct.
   struct dns_rr *additional = h_arena_malloc(p->arena,
-					     sizeof(struct dns_rr)*(header.additional_count));
-  for (size_t i=0, j=header.answer_count+header.authority_count; i<header.additional_count; ++i, ++j) {
-    additional[i].name = get_domain(rrs[j].seq->elements[0]);
-    additional[i].type = rrs[j].seq->elements[1]->uint;
-    additional[i].class = rrs[j].seq->elements[2]->uint;
-    additional[i].ttl = rrs[j].seq->elements[3]->uint;
-    additional[i].rdlength = rrs[j].seq->elements[4]->seq->used;
-    set_rr(additional[i], rrs[j].seq->elements[4]->seq);
+					     sizeof(struct dns_rr)*(header->additional_count));
+  for (size_t i=0, j=header->answer_count+header->authority_count; i<header->additional_count; ++i, ++j) {
+    additional[i] = *H_INDEX(dns_rr_t, rrs, j);
   }
   msg->additional = additional;
 
-  ret->user = (void*)msg;
+  return H_MAKE(dns_message_t, msg);
+}
+
+#define act_hdzero h_act_ignore
+#define act_qname  act_index0
+
+
+///
+// Grammar
+///
+
+const HParser* init_parser() {
+  static const HParser *ret = NULL;
+  if (ret)
+    return ret;
+
+  H_RULE  (domain,   init_domain());
+  H_AVRULE(hdzero,   h_bits(3, false));
+  H_ARULE (header,   h_sequence(h_bits(16, false), // ID
+				h_bits(1, false),  // QR
+				h_bits(4, false),  // opcode
+				h_bits(1, false),  // AA
+				h_bits(1, false),  // TC
+				h_bits(1, false),  // RD
+				h_bits(1, false),  // RA
+				hdzero,            // Z
+				h_bits(4, false),  // RCODE
+				h_uint16(),        // QDCOUNT
+				h_uint16(),        // ANCOUNT
+				h_uint16(),        // NSCOUNT
+				h_uint16(),        // ARCOUNT
+				NULL));
+  H_RULE  (type,     h_int_range(h_uint16(), 1, 16));
+  H_RULE  (qtype,    h_choice(type, 
+			      h_int_range(h_uint16(), 252, 255),
+			      NULL));
+  H_RULE  (class,    h_int_range(h_uint16(), 1, 4));
+  H_RULE  (qclass,   h_choice(class,
+			      h_int_range(h_uint16(), 255, 255),
+			      NULL));
+  H_RULE  (len,      h_int_range(h_uint8(), 1, 255));
+  H_ARULE (label,    h_length_value(len, h_uint8())); 
+  H_ARULE (qname,    h_sequence(h_many1(label),
+				h_ch('\x00'),
+				NULL));
+  H_ARULE (question, h_sequence(qname, qtype, qclass, NULL));
+  H_RULE  (rdata,    h_length_value(h_uint16(), h_uint8()));
+  H_ARULE (rr,       h_sequence(domain,            // NAME
+				type,              // TYPE
+				class,             // CLASS
+				h_uint32(),        // TTL
+				rdata,             // RDLENGTH+RDATA
+				NULL));
+  H_AVRULE(message,  h_sequence(header,
+				h_many(question),
+				h_many(rr),
+				h_end_p(),
+				NULL));
+
+  ret = message;
   return ret;
 }
 
-const HParser* init_parser() {
-  static HParser *dns_message = NULL;
-  if (dns_message)
-    return dns_message;
 
-  const HParser *domain = init_domain();
-
-  const HParser *dns_header = h_sequence(h_bits(16, false), // ID
-					 h_bits(1, false),  // QR
-					 h_bits(4, false),  // opcode
-					 h_bits(1, false),  // AA
-					 h_bits(1, false),  // TC
-					 h_bits(1, false),  // RD
-					 h_bits(1, false),  // RA
-					 h_ignore(h_attr_bool(h_bits(3, false), is_zero)), // Z
-					 h_bits(4, false),  // RCODE
-					 h_uint16(), // QDCOUNT
-					 h_uint16(), // ANCOUNT
-					 h_uint16(), // NSCOUNT
-					 h_uint16(), // ARCOUNT
-					 NULL);
-
-  const HParser *type = h_int_range(h_uint16(), 1, 16);
-
-  const HParser *qtype = h_choice(type, 
-				  h_int_range(h_uint16(), 252, 255),
-				  NULL);
-
-  const HParser *class = h_int_range(h_uint16(), 1, 4);
-  
-  const HParser *qclass = h_choice(class,
-				   h_int_range(h_uint16(), 255, 255),
-				   NULL);
-
-  const HParser *dns_question = h_sequence(h_sequence(h_many1(h_length_value(h_int_range(h_uint8(), 1, 255), 
-									     h_uint8())), 
-						      h_ch('\x00'),
-						      NULL),  // QNAME
-					   qtype,           // QTYPE
-					   qclass,          // QCLASS
-					   NULL);
- 
-
-  const HParser *dns_rr = h_sequence(domain,                          // NAME
-				     type,                            // TYPE
-				     class,                           // CLASS
-				     h_uint32(),                        // TTL
-				     h_length_value(h_uint16(), h_uint8()), // RDLENGTH+RDATA
-				     NULL);
-
-
-  dns_message = (HParser*)h_action(h_attr_bool(h_sequence(dns_header,
-							  h_many(dns_question),
-							  h_many(dns_rr),
-							  h_end_p(),
-							  NULL),
-					       validate_dns),
-				   pack_dns_struct);
-
-  return dns_message;
-}
+///
+// Main Program for a Dummy DNS Server
+///
 
 int start_listening() {
   // return: fd
@@ -442,7 +283,7 @@ int start_listening() {
 
 const int TYPE_MAX = 16;
 typedef const char* cstr;
-const char* TYPE_STR[17] = {
+static const char* TYPE_STR[17] = {
   "nil", "A", "NS", "MD",
   "MF", "CNAME", "SOA", "MB",
   "MG", "MR", "NULL", "WKS",

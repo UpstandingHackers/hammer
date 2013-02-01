@@ -54,13 +54,15 @@ typedef struct HCountedArray_ {
   struct HParsedToken_ **elements;
 } HCountedArray;
 
+typedef struct HBytes_ {
+  const uint8_t *token;
+  size_t len;
+} HBytes;
+
 typedef struct HParsedToken_ {
   HTokenType token_type;
   union {
-    struct {
-      const uint8_t *token;
-      size_t len;
-    } bytes;
+    HBytes bytes;
     int64_t sint;
     uint64_t uint;
     double dbl;

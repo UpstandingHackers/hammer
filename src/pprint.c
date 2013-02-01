@@ -69,7 +69,11 @@ void h_pprint(FILE* stream, const HParsedToken* tok, int indent, int delta) {
     fprintf(stream, "%*sUSER\n", indent, "");
     break;
   default:
-    assert_message(0, "Should not reach here.");
+    if(tok->token_type > TT_USER) {
+      fprintf(stream, "%*sUSER %d\n", indent, "", tok->token_type-TT_USER);
+    } else {
+      assert_message(0, "Should not reach here.");
+    }
   }
 }
 
