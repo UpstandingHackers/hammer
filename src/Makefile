@@ -38,6 +38,7 @@ HAMMER_PARTS := \
 	system_allocator.o \
 	benchmark.o \
 	compile.o \
+	glue.o \
 	$(PARSERS:%=parsers/%.o) \
 	$(BACKENDS:%=backends/%.o)
 
@@ -67,6 +68,7 @@ libhammer.a: $(HAMMER_PARTS)
 
 bitreader.o: test_suite.h
 hammer.o: hammer.h
+glue.o: hammer.h glue.h
 
 all: libhammer.a
 
