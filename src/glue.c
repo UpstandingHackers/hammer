@@ -55,6 +55,13 @@ HParsedToken *h_make_seq(HArena *arena)
   return ret;
 }
 
+HParsedToken *h_make_seqn(HArena *arena, size_t n)
+{
+  HParsedToken *ret = h_make_(arena, TT_SEQUENCE);
+  ret->seq = h_carray_new_sized(arena, n);
+  return ret;
+}
+
 HParsedToken *h_make_bytes(HArena *arena, size_t len)
 {
   HParsedToken *ret = h_make_(arena, TT_BYTES);
@@ -142,7 +149,7 @@ void h_seq_append(HParsedToken *xs, const HParsedToken *ys)
   assert(ys != NULL);
   assert(ys->token_type == TT_SEQUENCE);
 
-  for(size_t i; i<ys->seq->used; i++)
+  for(size_t i=0; i<ys->seq->used; i++)
     h_carray_append(xs->seq, ys->seq->elements[i]);
 }
 

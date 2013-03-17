@@ -77,14 +77,18 @@ HParserCacheValue* recall(HParserCacheKey *k, HParseState *state) {
 void setupLR(const HParser *p, HParseState *state, HLeftRec *rec_detect) {
   if (!rec_detect->head) {
     HRecursionHead *some = a_new(HRecursionHead, 1);
-    some->head_parser = p; some->involved_set = NULL; some->eval_set = NULL;
+    some->head_parser = p;
+    some->involved_set = h_slist_new(state->arena);
+    some->eval_set = NULL;
     rec_detect->head = some;
   }
   assert(state->lr_stack->head != NULL);
-  HLeftRec *lr = state->lr_stack->head->elem;
-  while (lr && lr->rule != p) {
+  HSlistNode *head = state->lr_stack->head;
+  HLeftRec *lr;
+  while (head && (lr = head->elem)->rule != p) {
     lr->head = rec_detect->head;
     h_slist_push(lr->head->involved_set, (void*)lr->rule);
+    head = head->next;
   }
 }
 
@@ -101,7 +105,7 @@ HParseResult* grow(HParserCacheKey *k, HParseState *state, HRecursionHead *head)
   HParseResult *old_res = old_cached->right->result;
   
   // reset the eval_set of the head of the recursion at each beginning of growth
-  head->eval_set = head->involved_set;
+  head->eval_set = h_slist_copy(head->involved_set);
   HParseResult *tmp_res = perform_lowlevel_parse(state, k->parser);
 
   if (tmp_res) {

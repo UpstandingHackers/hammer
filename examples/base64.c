@@ -1,3 +1,13 @@
+// Example parser: Base64, syntax only.
+//
+// Demonstrates how to construct a Hammer parser that recognizes valid Base64
+// sequences.
+//
+// Note that no semantic evaluation of the sequence is performed, i.e. the
+// byte sequence being represented is not returned, or determined. See
+// base64_sem1.c and base64_sem2.c for examples how to attach appropriate
+// semantic actions to the grammar.
+
 #include "../src/hammer.h"
 
 const HParser* document = NULL;
@@ -24,7 +34,7 @@ void init_parser(void)
                                                            base64_1, NULL)),
                                        NULL);
 
-    document = base64;
+    document = h_sequence(h_whitespace(base64), h_whitespace(h_end_p()), NULL);
 }
 
 

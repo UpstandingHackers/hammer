@@ -365,6 +365,17 @@ static void test_not(void) {
   g_check_parse_ok(not_2, "a++b", 4, "(u0x61 <2b.2b> u0x62)");
 }
 
+static void test_leftrec(void) {
+  const HParser *a_ = h_ch('a');
+
+  HParser *lr_ = h_indirect();
+  h_bind_indirect(lr_, h_choice(h_sequence(lr_, a_, NULL), a_, NULL));
+
+  g_check_parse_ok(lr_, "a", 1, "u0x61");
+  g_check_parse_ok(lr_, "aa", 2, "(u0x61 u0x61)");
+  g_check_parse_ok(lr_, "aaa", 3, "((u0x61 u0x61) u0x61)");
+}
+
 void register_parser_tests(void) {
   g_test_add_func("/core/parser/token", test_token);
   g_test_add_func("/core/parser/ch", test_ch);
@@ -406,4 +417,5 @@ void register_parser_tests(void) {
   g_test_add_func("/core/parser/and", test_and);
   g_test_add_func("/core/parser/not", test_not);
   g_test_add_func("/core/parser/ignore", test_ignore);
+  g_test_add_func("/core/parser/leftrec", test_leftrec);
 }
