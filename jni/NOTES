@@ -1,0 +1,26 @@
+USING THE JNI BINDINGS:
+1. import com.upstandinghackers.hammer.*;
+2. Add a static initializer block that loads the correct library, like this: static { System.loadLibrary("jhammer");  }
+3. Code stuff. Just look at Example.java for a few handy snippets (for walking the resulting syntax tree [AST] etc)
+4. Compile your java sources like always
+5. Add the folder containing libhammer.so/dll/whatever to Java's library path to run it, for example: java -Djava.library.path=. <CLASS>
+
+UNIMPLEMENTED:
+User-defined types, predicates and actions are unimplemented.
+Memory leaks because there is no reliable garbage collection.
+
+TODO:
+Testing
+
+
+TYPE MAPPING:
+Hammer      Java        JNI
+uint8_t     byte        jbyte       jbyte/byte is signed
+char        byte        jbyte       jchar would be 16 bit wide
+size_t      int         jint        signed as well; jsize == jint, actually
+int64_t     long        jlong       
+uint64_t     long        jlong       signed!
+bool        boolean     jboolean    JNI_TRUE / JNI_FALSE
+float       float       jfloat
+double      double      jdouble
+void        void        void

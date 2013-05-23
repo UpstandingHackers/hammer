@@ -1,0 +1,36 @@
+digraph {
+	graph [rankdir=LR];
+	subgraph complete {
+		node [color="gray",fontcolor="gray"];
+		glue;
+		regex_svm;
+		regex_rvm;
+		desugaring; // Needs merged.
+	}
+	/* The end result of the milestone, along with the subtasks listed */
+	milestone2 [color="green",style="filled"];
+	llk -> milestone2;
+	lr -> milestone2;
+	lalr8_gen -> lr; // Generate parse tables for LALR(8)
+	glr_gen -> lr; // Generate parse tables for GLR
+	llk_gen -> llk; // Generate parse tables for LL(k)
+	lr_driver -> lr; // Write driver for all LR-type algs; analagous to SVM and RVM implementations
+	llk_driver -> llk; // Write driver for LL(k)
+	regex -> milestone2;
+	glue -> milestone2;
+	tests -> milestone2;
+	
+	regex_gen -> regex; // should be mostly done; the rest is concurrent with regex_svm_actions
+	regex_driver -> regex;
+	regex_svm -> regex_driver;
+	regex_rvm -> regex_driver;
+	regex_svm_actions -> regex_driver; // 1 for each way that an HParsedToken can be extracted from the stack.
+
+
+	/*
+	* 
+	*/
+	desugaring -> llk_gen;
+	desugaring -> lalr8_gen;
+	desugaring -> glr_gen;
+}

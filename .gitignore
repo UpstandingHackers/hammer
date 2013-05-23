@@ -1,6 +1,9 @@
 *.o
 *~
 *.a
+*.class
+*.so
+jni/com*.h
 src/test_suite
 lib/hush
 examples/dns
@@ -10,3 +13,8 @@ examples/base64_sem2
 TAGS
 *.swp
 *.swo
+\#*
+.*
+docs/milestone2.dot.pdf
+*.dot.pdf
+Session.vim

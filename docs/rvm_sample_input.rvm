@@ -1,0 +1,17 @@
++C
+int foo() {
+    return 42;
+}
+
++SVM /svm/simple
+@input ""
+@output "()"
+0 ACCEPT
+
++SVM /svm/string
+@input "quux"
+@outut "(<5555>)"
+1 MARK
+2 CAPTURE
+2 ACCEPT
+

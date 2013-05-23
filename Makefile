@@ -3,7 +3,7 @@
 # and kick off a recursive make
 # Also, "make src/all" turns into "make -C src all"
 
-SUBDIRS = src examples
+SUBDIRS = src examples jni
 
 include config.mk
 
@@ -16,6 +16,9 @@ CONFIG_VARS= INCLUDE_TESTS
 
 test: src/test_suite
 	$<
+
+examples/all: src/all
+examples/compile: src/compile
 
 define SUBDIR_TEMPLATE
 $(1)/%:

@@ -136,7 +136,7 @@ HHashTable* h_hashtable_new(HArena *arena, HEqualFunc equalFunc, HHashFunc hashF
   return ht;
 }
 
-void* h_hashtable_get(HHashTable* ht, void* key) {
+void* h_hashtable_get(const HHashTable* ht, const void* key) {
   HHashValue hashval = ht->hashFunc(key);
 #ifdef CONSISTENCY_CHECK
   assert((ht->capacity & (ht->capacity - 1)) == 0); // capacity is a power of 2
@@ -154,7 +154,7 @@ void* h_hashtable_get(HHashTable* ht, void* key) {
   return NULL;
 }
 
-void h_hashtable_put(HHashTable* ht, void* key, void* value) {
+void h_hashtable_put(HHashTable* ht, const void* key, void* value) {
   // # Start with a rebalancing
   //h_hashtable_ensure_capacity(ht, ht->used + 1);
 
@@ -165,12 +165,14 @@ void h_hashtable_put(HHashTable* ht, void* key, void* value) {
 
   HHashTableEntry *hte = &ht->contents[hashval & (ht->capacity - 1)];
   if (hte->key != NULL) {
-    do {
+    for(;;) {
+      // check each link, stay on last if not found
       if (hte->hashval == hashval && ht->equalFunc(key, hte->key))
 	goto insert_here;
-      if (hte->next != NULL)
-	hte = hte->next;
-    } while (hte->next != NULL);
+      if (hte->next == NULL)
+        break;
+      hte = hte->next;
+    }
     // Add a new link...
     assert (hte->next == NULL);
     hte->next = h_arena_malloc(ht->arena, sizeof(HHashTableEntry));
@@ -186,7 +188,38 @@ void h_hashtable_put(HHashTable* ht, void* key, void* value) {
   hte->hashval = hashval;
 }
 
-int   h_hashtable_present(HHashTable* ht, void* key) {
+void h_hashtable_update(HHashTable *dst, const HHashTable *src) {
+  size_t i;
+  HHashTableEntry *hte;
+  for(i=0; i < src->capacity; i++) {
+    for(hte = &src->contents[i]; hte; hte = hte->next) {
+      if(hte->key == NULL)
+        continue;
+      h_hashtable_put(dst, hte->key, hte->value);
+    }
+  }
+}
+
+void h_hashtable_merge(void *(*combine)(void *v1, void *v2),
+	HHashTable *dst, const HHashTable *src) {
+  size_t i;
+  HHashTableEntry *hte;
+  for(i=0; i < src->capacity; i++) {
+    for(hte = &src->contents[i]; hte; hte = hte->next) {
+      if(hte->key == NULL)
+        continue;
+      void *oldvalue = h_hashtable_get(dst, hte->key);
+      void *newvalue;
+      if(oldvalue)
+        newvalue = combine(oldvalue, hte->value);
+      else
+        newvalue = hte->value;
+      h_hashtable_put(dst, hte->key, newvalue);
+    }
+  }
+}
+
+int   h_hashtable_present(const HHashTable* ht, const void* key) {
   HHashValue hashval = ht->hashFunc(key);
 #ifdef CONSISTENCY_CHECK
   assert((ht->capacity & (ht->capacity - 1)) == 0); // capacity is a power of 2
@@ -202,7 +235,7 @@ int   h_hashtable_present(HHashTable* ht, void* key) {
   }
   return false;
 }
-void  h_hashtable_del(HHashTable* ht, void* key) {
+void  h_hashtable_del(HHashTable* ht, const void* key) {
   HHashValue hashval = ht->hashFunc(key);
 #ifdef CONSISTENCY_CHECK
   assert((ht->capacity & (ht->capacity - 1)) == 0); // capacity is a power of 2
@@ -242,3 +275,11 @@ void  h_hashtable_free(HHashTable* ht) {
   h_arena_free(ht->arena, ht->contents);
 }
 
+bool h_eq_ptr(const void *p, const void *q) {
+  return (p==q);
+}
+
+HHashValue h_hash_ptr(const void *p) {
+  // XXX just djbhash it
+  return (uintptr_t)p >> 4;
+}

@@ -18,6 +18,7 @@
 #ifndef HAMMER_INTERNAL__H
 #define HAMMER_INTERNAL__H
 #include <err.h>
+#include <string.h>
 #include "hammer.h"
 
 #ifdef NDEBUG
@@ -47,7 +48,7 @@ static inline void h_generic_free(HAllocator *allocator, void* ptr) {
   allocator->free(allocator, ptr);
 }
 
-HAllocator system_allocator;
+extern HAllocator system_allocator;
 
 
 typedef struct HInputStream_ {
@@ -70,13 +71,32 @@ typedef struct HSlist_ {
   struct HArena_ *arena;
 } HSlist;
 
+typedef unsigned int *HCharset;
+
+static inline HCharset new_charset(HAllocator* mm__) {
+  HCharset cs = h_new(unsigned int, 256 / sizeof(unsigned int));
+  memset(cs, 0, 256);
+  return cs;
+}
+
+static inline int charset_isset(HCharset cs, uint8_t pos) {
+  return !!(cs[pos / sizeof(*cs)] & (1 << (pos % sizeof(*cs))));
+}
+
+static inline void charset_set(HCharset cs, uint8_t pos, int val) {
+  cs[pos / sizeof(*cs)] =
+    val
+    ? cs[pos / sizeof(*cs)] |  (1 << (pos % sizeof(*cs)))
+    : cs[pos / sizeof(*cs)] & ~(1 << (pos % sizeof(*cs)));
+}
+
 typedef unsigned int HHashValue;
 typedef HHashValue (*HHashFunc)(const void* key);
 typedef bool (*HEqualFunc)(const void* key1, const void* key2);
 
 typedef struct HHashTableEntry_ {
   struct HHashTableEntry_ *next;
-  void* key;
+  const void* key;
   void* value;
   HHashValue hashval;
 } HHashTableEntry;
@@ -110,8 +130,9 @@ struct HParseState_ {
 };
 
 typedef struct HParserBackendVTable_ {
-  int (*compile)(HAllocator *mm__, const HParser* parser, const void* params);
-  HParseResult* (*parse)(HAllocator *mm__, const HParser* parser, HParseState* parse_state);
+  int (*compile)(HAllocator *mm__, HParser* parser, const void* params);
+  HParseResult* (*parse)(HAllocator *mm__, const HParser* parser, HInputStream* stream);
+  void (*free)(HParser* parser);
 } HParserBackendVTable;
 
 
@@ -193,8 +214,10 @@ struct HBitWriter_ {
 
 // }}}
 
+
 // Backends {{{
 extern HParserBackendVTable h__packrat_backend_vtable;
+extern HParserBackendVTable h__llk_backend_vtable;
 // }}}
 
 // TODO(thequux): Set symbol visibility for these functions so that they aren't exported.
@@ -203,6 +226,17 @@ long long h_read_bits(HInputStream* state, int count, char signed_p);
 // need to decide if we want to make this public. 
 HParseResult* h_do_parse(const HParser* parser, HParseState *state);
 void put_cached(HParseState *ps, const HParser *p, HParseResult *cached);
+
+static inline
+HParser *h_new_parser(HAllocator *mm__, const HParserVtable *vt, void *env) {
+  HParser *p = h_new(HParser, 1);
+  memset(p, 0, sizeof(HParser));
+  p->vtable = vt;
+  p->env = env;
+  return p;
+}
+
+HCFChoice *h_desugar(HAllocator *mm__, const HParser *parser);
 
 HCountedArray *h_carray_new_sized(HArena * arena, size_t size);
 HCountedArray *h_carray_new(HArena * arena);
@@ -215,13 +249,66 @@ void h_slist_push(HSlist *slist, void* item);
 bool h_slist_find(HSlist *slist, const void* item);
 HSlist* h_slist_remove_all(HSlist *slist, const void* item);
 void h_slist_free(HSlist *slist);
+static inline bool h_slist_empty(const HSlist *sl) { return (sl->head == NULL); }
 
 HHashTable* h_hashtable_new(HArena *arena, HEqualFunc equalFunc, HHashFunc hashFunc);
-void* h_hashtable_get(HHashTable* ht, void* key);
-void h_hashtable_put(HHashTable* ht, void* key, void* value);
-int   h_hashtable_present(HHashTable* ht, void* key);
-void  h_hashtable_del(HHashTable* ht, void* key);
+void* h_hashtable_get(const HHashTable* ht, const void* key);
+void  h_hashtable_put(HHashTable* ht, const void* key, void* value);
+void  h_hashtable_update(HHashTable* dst, const HHashTable *src);
+void  h_hashtable_merge(void *(*combine)(void *v1, void *v2),
+                        HHashTable *dst, const HHashTable *src);
+int   h_hashtable_present(const HHashTable* ht, const void* key);
+void  h_hashtable_del(HHashTable* ht, const void* key);
 void  h_hashtable_free(HHashTable* ht);
+static inline bool h_hashtable_empty(const HHashTable* ht) { return (ht->used == 0); }
+
+typedef HHashTable HHashSet;
+#define h_hashset_new(a,eq,hash) h_hashtable_new(a,eq,hash)
+#define h_hashset_put(ht,el)     h_hashtable_put(ht, el, NULL)
+#define h_hashset_put_all(a,b)   h_hashtable_update(a, b)
+#define h_hashset_present(ht,el) h_hashtable_present(ht,el)
+#define h_hashset_empty(ht)      h_hashtable_empty(ht)
+#define h_hashset_del(ht,el)     h_hashtable_del(ht,el)
+#define h_hashset_free(ht)       h_hashtable_free(ht)
+
+bool h_eq_ptr(const void *p, const void *q);
+HHashValue h_hash_ptr(const void *p);
+
+typedef struct HCFSequence_ HCFSequence;
+
+typedef struct HCFChoice_ {
+  enum {
+    HCF_END,
+    HCF_CHOICE,
+    HCF_CHARSET,
+    HCF_CHAR
+  } type;
+  union {
+    HCharset charset;
+    HCFSequence** seq;
+    uint8_t chr;
+  };
+  HAction reshape;  // take CFG parse tree to HParsedToken of expected form.
+                    // to execute before action and pred are applied.
+  HAction action;
+  HPredicate pred;
+} HCFChoice;
+
+struct HCFSequence_ {
+  HCFChoice **items; // last one is NULL
+};
+
+struct HParserVtable_ {
+  HParseResult* (*parse)(void *env, HParseState *state);
+  bool (*isValidRegular)(void *env);
+  bool (*isValidCF)(void *env);
+  bool (*compile_to_rvm)(HRVMProg *prog, void* env); // FIXME: forgot what the bool return value was supposed to mean.
+  HCFChoice* (*desugar)(HAllocator *mm__, void *env);
+};
+
+bool h_false(void*);
+bool h_true(void*);
+bool h_not_regular(HRVMProg*, void*);
 
 #if 0
 #include <stdlib.h>

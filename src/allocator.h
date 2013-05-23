@@ -19,6 +19,7 @@
 #define HAMMER_ALLOCATOR__H__
 #include <sys/types.h>
 
+// TODO(thequux): Turn this into an "HAllocatorVtable", and add a wrapper that also takes an environment pointer.
 typedef struct HAllocator_ {
   void* (*alloc)(struct HAllocator_* allocator, size_t size);
   void* (*realloc)(struct HAllocator_* allocator, void* ptr, size_t size);

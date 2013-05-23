@@ -26,7 +26,9 @@ PARSERS := \
 	indirect
 
 BACKENDS := \
-	packrat
+	packrat \
+	llk \
+	regex
 
 HAMMER_PARTS := \
 	bitreader.o \
@@ -34,10 +36,11 @@ HAMMER_PARTS := \
 	bitwriter.o \
 	pprint.o \
 	allocator.o \
+	desugar.o \
 	datastructures.o \
 	system_allocator.o \
 	benchmark.o \
-	compile.o \
+	cfgrammar.o \
 	glue.o \
 	$(PARSERS:%=parsers/%.o) \
 	$(BACKENDS:%=backends/%.o)
@@ -46,6 +49,7 @@ TESTS := t_benchmark.o \
 	 t_bitreader.o \
 	 t_bitwriter.o \
 	 t_parser.o \
+	 t_grammar.o \
 	 t_misc.o \
 	 test_suite.o
 
@@ -61,6 +65,8 @@ include ../common.mk
 
 $(TESTS): CFLAGS += $(TEST_CFLAGS)
 $(TESTS): LDFLAGS += $(TEST_LDFLAGS)
+
+CFLAGS += -fPIC
 
 all: libhammer.a
 

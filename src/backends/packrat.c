@@ -1,6 +1,15 @@
 #include <assert.h>
+#include <string.h>
 #include "../internal.h"
 #include "../parsers/parser_internal.h"
+
+static uint32_t djbhash(const uint8_t *buf, size_t len) {
+  uint32_t hash = 5381;
+  while (len--) {
+    hash = hash * 33 + *buf++;
+  }
+  return hash;
+}
 
 // short-hand for constructing HCachedResult's
 static HCachedResult *cached_result(const HParseState *state, HParseResult *result) {
@@ -194,16 +203,46 @@ HParseResult* h_do_parse(const HParser* parser, HParseState *state) {
   }
 }
 
-int h_packrat_compile(HAllocator* mm__, const HParser* parser, const void* params) {
+int h_packrat_compile(HAllocator* mm__, HParser* parser, const void* params) {
+  parser->backend = PB_PACKRAT;
   return 0; // No compilation necessary, and everything should work
 	    // out of the box.
 }
 
-HParseResult *h_packrat_parse(HAllocator* mm__, const HParser* parser, HParseState* parse_state) {
-  return h_do_parse(parser, parse_state);
+void h_packrat_free(HParser *parser) {
+  parser->backend = PB_PACKRAT; // revert to default, oh that's us
+}
+
+static uint32_t cache_key_hash(const void* key) {
+  return djbhash(key, sizeof(HParserCacheKey));
+}
+static bool cache_key_equal(const void* key1, const void* key2) {
+  return memcmp(key1, key2, sizeof(HParserCacheKey)) == 0;
+}
+
+HParseResult *h_packrat_parse(HAllocator* mm__, const HParser* parser, HInputStream *input_stream) {
+  HArena * arena = h_new_arena(mm__, 0);
+  HParseState *parse_state = a_new_(arena, HParseState, 1);
+  parse_state->cache = h_hashtable_new(arena, cache_key_equal, // key_equal_func
+				       cache_key_hash); // hash_func
+  parse_state->input_stream = *input_stream;
+  parse_state->lr_stack = h_slist_new(arena);
+  parse_state->recursion_heads = h_hashtable_new(arena, cache_key_equal,
+						 cache_key_hash);
+  parse_state->arena = arena;
+  HParseResult *res = h_do_parse(parser, parse_state);
+  h_slist_free(parse_state->lr_stack);
+  h_hashtable_free(parse_state->recursion_heads);
+  // tear down the parse state
+  h_hashtable_free(parse_state->cache);
+  if (!res)
+    h_delete_arena(parse_state->arena);
+
+  return res;
 }
 
 HParserBackendVTable h__packrat_backend_vtable = {
   .compile = h_packrat_compile,
-  .parse = h_packrat_parse
+  .parse = h_packrat_parse,
+  .free = h_packrat_free
 };

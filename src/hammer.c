@@ -26,13 +26,12 @@
 #include "allocator.h"
 #include "parsers/parser_internal.h"
 
-static uint32_t djbhash(const uint8_t *buf, size_t len) {
-  uint32_t hash = 5381;
-  while (len--) {
-    hash = hash * 33 + *buf++;
-  }
-  return hash;
-}
+static HParserBackendVTable *backends[PB_MAX + 1] = {
+  &h__packrat_backend_vtable,
+  &h__regex_backend_vtable,
+  &h__llk_backend_vtable,
+};
+
 
 /* Helper function, since these lines appear in every parser */
 
@@ -42,46 +41,53 @@ typedef struct {
 } HTwoParsers;
 
 
-static uint32_t cache_key_hash(const void* key) {
-  return djbhash(key, sizeof(HParserCacheKey));
-}
-static bool cache_key_equal(const void* key1, const void* key2) {
-  return memcmp(key1, key2, sizeof(HParserCacheKey)) == 0;
-}
 
 
 HParseResult* h_parse(const HParser* parser, const uint8_t* input, size_t length) {
   return h_parse__m(&system_allocator, parser, input, length);
 }
-HParseResult* h_parse__m(HAllocator* mm__, const HParser* parser, const uint8_t* input, size_t length) { 
+HParseResult* h_parse__m(HAllocator* mm__, const HParser* parser, const uint8_t* input, size_t length) {
   // Set up a parse state...
-  HArena * arena = h_new_arena(mm__, 0);
-  HParseState *parse_state = a_new_(arena, HParseState, 1);
-  parse_state->cache = h_hashtable_new(arena, cache_key_equal, // key_equal_func
-					      cache_key_hash); // hash_func
-  parse_state->input_stream.input = input;
-  parse_state->input_stream.index = 0;
-  parse_state->input_stream.bit_offset = 8; // bit big endian
-  parse_state->input_stream.overrun = 0;
-  parse_state->input_stream.endianness = BIT_BIG_ENDIAN | BYTE_BIG_ENDIAN;
-  parse_state->input_stream.length = length;
-  parse_state->lr_stack = h_slist_new(arena);
-  parse_state->recursion_heads = h_hashtable_new(arena, cache_key_equal,
-						  cache_key_hash);
-  parse_state->arena = arena;
-  HParseResult *res = h_do_parse(parser, parse_state);
-  h_slist_free(parse_state->lr_stack);
-  h_hashtable_free(parse_state->recursion_heads);
-  // tear down the parse state
-  h_hashtable_free(parse_state->cache);
-  if (!res)
-    h_delete_arena(parse_state->arena);
-
-  return res;
+  HInputStream input_stream = {
+    .index = 0,
+    .bit_offset = 8,
+    .overrun = 0,
+    .endianness = BIT_BIG_ENDIAN | BYTE_BIG_ENDIAN,
+    .length = length,
+    .input = input
+  };
+  
+  return backends[parser->backend]->parse(mm__, parser, &input_stream);
 }
 
 void h_parse_result_free(HParseResult *result) {
+  if(result == NULL) return;
   h_delete_arena(result->arena);
 }
 
+bool h_false(void* env) {
+  (void)env;
+  return false;
+}
 
+bool h_true(void* env) {
+  (void)env;
+  return true;
+}
+
+bool h_not_regular(HRVMProg *prog, void *env) {
+  (void)env;
+  return false;
+}
+
+int h_compile(HParser* parser, HParserBackend backend, const void* params) {
+  return h_compile__m(&system_allocator, parser, backend, params);
+}
+
+int h_compile__m(HAllocator* mm__, HParser* parser, HParserBackend backend, const void* params) {
+  backends[parser->backend]->free(parser);
+  int ret = backends[backend]->compile(mm__, parser, params);
+  if (!ret)
+    parser->backend = backend;
+  return ret;
+}

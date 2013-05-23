@@ -1,0 +1,65 @@
+digraph {
+	graph [rankdir=LR];
+
+	subgraph complete {
+		node [color="gray",fontcolor="gray"];
+	}
+
+	subgraph groups {
+		node [color="blue",fontcolor="blue"];
+		cpp;
+		python;
+		ruby;
+		go;
+		php;
+		dotnet;
+	}
+	
+	milestone3 [color="green",style="filled"];
+
+
+	function_desc_fmt -> function_descs;
+	function_desc_fmt -> binding_generator;
+
+	binding_generator -> cpp_gen;
+	binding_generator -> python_gen;
+	binding_generator -> ruby_gen;
+	binding_generator -> go_gen;
+	binding_generator -> php_gen;
+	binding_generator -> dotnet_gen;
+
+	function_descs -> cpp_gen;
+	function_descs -> python_gen;
+	function_descs -> ruby_gen;
+	function_descs -> go_gen;
+	function_descs -> php_gen;
+	function_descs -> dotnet_gen;
+
+
+	// Plugins to generate a type of code
+	cpp_gen -> cpp;
+	python_gen -> python;
+	ruby_gen -> ruby;
+	go_gen -> go;
+	php_gen -> php;
+	dotnet_gen -> dotnet;
+	
+	// base code... developed concurrently with _gen's
+	cpp_base -> cpp;
+	python_base -> python;
+	ruby_base -> ruby;
+	go_base -> go;
+	php_base -> php;
+	dotnet_base -> dotnet;
+	
+	// Bindings for various languages. These are just groupings.
+	cpp -> milestone3;
+	python -> milestone3;
+	ruby -> milestone3;
+	go -> milestone3;
+	php -> milestone3;
+	dotnet -> milestone3;
+
+	
+
+}

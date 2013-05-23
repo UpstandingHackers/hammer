@@ -11,7 +11,7 @@ HParserTestcase testcases[] = {
 };
 
 static void test_benchmark_1() {
-  const HParser *parser = h_sepBy1(h_choice(h_ch('1'), h_ch('2'), h_ch('3'), NULL), h_ch(',')); 
+  HParser *parser = h_sepBy1(h_choice(h_ch('1'), h_ch('2'), h_ch('3'), NULL), h_ch(',')); 
 
   HBenchmarkResults *res = h_benchmark(parser, testcases);
   h_benchmark_report(stderr, res);

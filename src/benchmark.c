@@ -21,22 +21,22 @@
 
 */
 
-HBenchmarkResults *h_benchmark(const HParser* parser, HParserTestcase* testcases) {
+HBenchmarkResults *h_benchmark(HParser* parser, HParserTestcase* testcases) {
   return h_benchmark__m(&system_allocator, parser, testcases);
 }
 
-HBenchmarkResults *h_benchmark__m(HAllocator* mm__, const HParser* parser, HParserTestcase* testcases) {
+HBenchmarkResults *h_benchmark__m(HAllocator* mm__, HParser* parser, HParserTestcase* testcases) {
   // For now, just output the results to stderr
   HParserTestcase* tc = testcases;
   HParserBackend backend = PB_MIN;
   HBenchmarkResults *ret = h_new(HBenchmarkResults, 1);
-  ret->len = PB_MAX-PB_MIN;
+  ret->len = PB_MAX-PB_MIN+1;
   ret->results = h_new(HBackendResults, ret->len);
 
-  for (backend = PB_MIN; backend < PB_MAX; backend++) {
+  for (backend = PB_MIN; backend <= PB_MAX; backend++) {
     ret->results[backend].backend = backend;
     // Step 1: Compile grammar for given parser...
-    if (h_compile(parser, PB_MIN, NULL) == -1) {
+    if (h_compile(parser, backend, NULL) == -1) {
       // backend inappropriate for grammar...
       fprintf(stderr, "failed\n");
       ret->results[backend].compile_success = false;
@@ -58,8 +58,8 @@ HBenchmarkResults *h_benchmark__m(HAllocator* mm__, const HParser* parser, HPars
 	res_unamb = h_write_result_unamb(res->ast);
       } else
 	res_unamb = NULL;
-      if ((res_unamb == NULL && tc->output_unambiguous == NULL)
-	  || (strcmp(res_unamb, tc->output_unambiguous) != 0)) {
+      if ((res_unamb == NULL && tc->output_unambiguous != NULL)
+	  || (res_unamb != NULL && strcmp(res_unamb, tc->output_unambiguous) != 0)) {
 	// test case failed...
 	fprintf(stderr, "failed\n");
 	// We want to run all testcases, for purposes of generating a
@@ -108,6 +108,8 @@ void h_benchmark_report(FILE* stream, HBenchmarkResults* result) {
   for (size_t i=0; i<result->len; ++i) {
     fprintf(stream, "Backend %ld ... \n", i);
     for (size_t j=0; j<result->results[i].n_testcases; ++j) {
+      if(result->results[i].cases == NULL)
+        continue;
       fprintf(stream, "Case %ld: %ld ns/parse\n", j,  result->results[i].cases[j].parse_time);
     }
   }

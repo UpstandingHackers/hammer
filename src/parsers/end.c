@@ -10,17 +10,30 @@ static HParseResult* parse_end(void *env, HParseState *state) {
   }
 }
 
+static HCFChoice* desugar_end(HAllocator *mm__, void *env) {
+  static HCFChoice ret = {
+    .type = HCF_END
+  };
+  return &ret;
+}
+
+static bool end_ctrvm(HRVMProg *prog, void *env) {
+  h_rvm_insert_insn(prog, RVM_EOF, 0);
+  return true;
+}
+
 static const HParserVtable end_vt = {
   .parse = parse_end,
+  .isValidRegular = h_true,
+  .isValidCF = h_true,
+  .desugar = desugar_end,
+  .compile_to_rvm = end_ctrvm,
 };
 
-const HParser* h_end_p() {
+HParser* h_end_p() {
   return h_end_p__m(&system_allocator);
 }
 
-const HParser* h_end_p__m(HAllocator* mm__) { 
-  HParser *ret = h_new(HParser, 1);
-  ret->vtable = &end_vt;
-  ret->env = NULL;
-  return (const HParser*)ret;
+HParser* h_end_p__m(HAllocator* mm__) { 
+  return h_new_parser(mm__, &end_vt, NULL);
 }

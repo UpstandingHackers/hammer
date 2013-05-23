@@ -88,9 +88,12 @@
 // action such as h_act_index.
 //
 
-const HParsedToken *h_act_ignore(const HParseResult *p);
 const HParsedToken *h_act_index(int i, const HParseResult *p);
+const HParsedToken *h_act_first(const HParseResult *p);
+const HParsedToken *h_act_second(const HParseResult *p);
+const HParsedToken *h_act_last(const HParseResult *p);
 const HParsedToken *h_act_flatten(const HParseResult *p);
+const HParsedToken *h_act_ignore(const HParseResult *p);
 
 // Define 'myaction' as a specialization of 'paction' by supplying the leading
 // parameters.
