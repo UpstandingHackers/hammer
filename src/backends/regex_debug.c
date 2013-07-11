@@ -15,13 +15,14 @@ char* getsym(void* addr) {
   if (dladdr(addr, &dli) != 0 && dli.dli_sname != NULL) {
     if (dli.dli_saddr == addr)
       return strdup(dli.dli_sname);
-    else
-      asprintf(&retstr, "%s+0x%lx", dli.dli_sname, addr - dli.dli_saddr);
+    else if (asprintf(&retstr, "%s+0x%lx", dli.dli_sname, addr - dli.dli_saddr) > 0)
+      return retstr;
   } else
 #endif
-    asprintf(&retstr, "%p", addr);
-
-  return retstr;
+    if (asprintf(&retstr, "%p", addr) > 0)
+      return retstr;
+    else
+      return NULL;
 }
 
 const char* rvm_op_names[RVM_OPCOUNT] = {
