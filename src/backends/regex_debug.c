@@ -1,7 +1,7 @@
 // Intended to be included from regex_debug.c
 #define _GNU_SOURCE
 #include <stdio.h>
-#include <malloc.h>
+#include <stdlib.h>
 
 
 

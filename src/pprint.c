@@ -21,6 +21,7 @@
 #include "hammer.h"
 #include "internal.h"
 #include <stdlib.h>
+#include <inttypes.h>
 
 typedef struct pp_state {
   int delta;
@@ -49,13 +50,13 @@ void h_pprint(FILE* stream, const HParsedToken* tok, int indent, int delta) {
     break;
   case TT_SINT:
     if (tok->sint < 0)
-      fprintf(stream, "%*ss -%#lx\n", indent, "", -tok->sint);
+      fprintf(stream, "%*ss -%#" PRIx64 "\n", indent, "", -tok->sint);
     else
-      fprintf(stream, "%*ss %#lx\n", indent, "", tok->sint);
+      fprintf(stream, "%*ss %#" PRIx64 "\n", indent, "", tok->sint);
       
     break;
   case TT_UINT:
-    fprintf(stream, "%*su %#lx\n", indent, "", tok->uint);
+    fprintf(stream, "%*su %#" PRIx64 "\n", indent, "", tok->uint);
     break;
   case TT_SEQUENCE: {
     fprintf(stream, "%*s[\n", indent, "");
@@ -128,14 +129,14 @@ static void unamb_sub(const HParsedToken* tok, struct result_buf *buf) {
     break;
   case TT_SINT:
     if (tok->sint < 0)
-      len = asprintf(&tmpbuf, "s-%#lx", -tok->sint);
+      len = asprintf(&tmpbuf, "s-%#" PRIx64, -tok->sint);
     else
-      len = asprintf(&tmpbuf, "s%#lx", tok->sint);
+      len = asprintf(&tmpbuf, "s%#" PRIx64, tok->sint);
     append_buf(buf, tmpbuf, len);
     free(tmpbuf);
     break;
   case TT_UINT:
-    len = asprintf(&tmpbuf, "u%#lx", tok->uint);
+    len = asprintf(&tmpbuf, "u%#" PRIx64, tok->uint);
     append_buf(buf, tmpbuf, len);
     free(tmpbuf);
     break;
