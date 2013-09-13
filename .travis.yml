@@ -2,6 +2,11 @@ language: c
 compiler:
   - gcc
   - clang
-script: scons
+before_install:
+  - sudo pip install cpp-coveralls --use-mirrors
+script: 
+  - scons --coverage
+after_success:
+  - coveralls
 notifications:
   irc: "irc.upstandinghackers.com#hammer"

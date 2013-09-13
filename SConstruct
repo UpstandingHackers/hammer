@@ -12,6 +12,12 @@ AddOption("--variant",
           action="store",
           help="Build variant (debug or opt)")
 
+AddOption("--coverage",
+          dest="coverage",
+          default=False,
+          action="store_true",
+          help="Build with coverage instrumentation")
+
 env['BUILDDIR'] = 'build/$VARIANT'
 
 dbg = env.Clone(VARIANT='debug')
@@ -24,6 +30,12 @@ if GetOption("variant") == 'debug':
     env = dbg
 else:
     env = opt
+
+if GetOption("coverage"):
+    env.Append(CFLAGS=["-fprofile-arcs", "-ftest-coverage"],
+               CXXFLAGS=["-fprofile-arcs", "-ftest-coverage"],
+               LDFLAGS=["-fprofile-arcs", "-ftest-coverage"],
+               LIBS=['gcov'])
 
 if os.getenv("CC") == "clang":
     env.Replace(CC="clang",
