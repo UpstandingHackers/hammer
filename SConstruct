@@ -28,7 +28,7 @@ if GetOption("variant") == 'debug':
 else:
     env = opt
 
-if os.getenv("CC") == "clang":
+if os.getenv("CC") == "clang" or env['PLATFORM'] == 'darwin':
     env.Replace(CC="clang",
                 CXX="clang++")
 Export('env')
