@@ -38,8 +38,11 @@ else:
 if GetOption("coverage"):
     env.Append(CFLAGS=["-fprofile-arcs", "-ftest-coverage"],
                CXXFLAGS=["-fprofile-arcs", "-ftest-coverage"],
-               LDFLAGS=["-fprofile-arcs", "-ftest-coverage"],
-               LIBS=['gcov'])
+               LDFLAGS=["-fprofile-arcs", "-ftest-coverage"])
+    if os.getenv("CC") == "clang":
+        env.Append(LIBS=["profile_rt"])
+    else:
+        env.Append(LIBS=['gcov'])
 
 if os.getenv("CC") == "clang" or env['PLATFORM'] == 'darwin':
     env.Replace(CC="clang",
