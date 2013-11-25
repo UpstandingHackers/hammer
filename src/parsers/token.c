@@ -80,6 +80,8 @@ HParser* h_token(const uint8_t *str, const size_t len) {
 }
 HParser* h_token__m(HAllocator* mm__, const uint8_t *str, const size_t len) { 
   HToken *t = h_new(HToken, 1);
-  t->str = (uint8_t*)str, t->len = len;
+  uint8_t *str_cpy = h_new(uint8_t, len);
+  memcpy(str_cpy, str, len);
+  t->str = str_cpy, t->len = len;
   return h_new_parser(mm__, &token_vt, t);
 }

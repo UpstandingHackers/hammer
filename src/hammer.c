@@ -62,6 +62,10 @@ HParseResult* h_parse__m(HAllocator* mm__, const HParser* parser, const uint8_t*
   return backends[parser->backend]->parse(mm__, parser, &input_stream);
 }
 
+void h_parse_result_free__m(HAllocator *alloc, HParseResult *result) {
+  h_parse_result_free(result);
+}
+
 void h_parse_result_free(HParseResult *result) {
   if(result == NULL) return;
   h_delete_arena(result->arena);

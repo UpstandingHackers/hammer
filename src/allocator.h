@@ -29,7 +29,11 @@ typedef struct HAllocator_ {
 typedef struct HArena_ HArena ; // hidden implementation
 
 HArena *h_new_arena(HAllocator* allocator, size_t block_size); // pass 0 for default...
+#ifndef SWIG
 void* h_arena_malloc(HArena *arena, size_t count) __attribute__(( malloc, alloc_size(2) ));
+#else
+void* h_arena_malloc(HArena *arena, size_t count);
+#endif
 void h_arena_free(HArena *arena, void* ptr); // For future expansion, with alternate memory managers.
 void h_delete_arena(HArena *arena);
 

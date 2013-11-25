@@ -21,6 +21,10 @@ static const HParserVtable indirect_vt = {
   .compile_to_rvm = h_not_regular,
 };
 
+void h_bind_indirect__m(HAllocator *mm__, HParser* indirect, const HParser* inner) {
+  h_bind_indirect(indirect, inner);
+}
+
 void h_bind_indirect(HParser* indirect, const HParser* inner) {
   assert_message(indirect->vtable == &indirect_vt, "You can only bind an indirect parser");
   indirect->env = (void*)inner;

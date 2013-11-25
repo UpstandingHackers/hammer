@@ -29,7 +29,9 @@
 #define BIT_LITTLE_ENDIAN 0x0
 #define BYTE_LITTLE_ENDIAN 0x0
 
+#ifndef HAMMER_INTERNAL__NO_STDARG_H
 typedef int bool;
+#endif // HAMMER_INTERNAL__NO_STDARG_H
 
 typedef struct HParseState_ HParseState;
 
@@ -68,8 +70,21 @@ typedef struct HBytes_ {
   size_t len;
 } HBytes;
 
+#ifdef SWIG
+typedef union {
+  HBytes bytes;
+  int64_t sint;
+  uint64_t uint;
+  double dbl;
+  float flt;
+  HCountedArray *seq;
+  void *user;
+} HTokenData;
+#endif
+
 typedef struct HParsedToken_ {
   HTokenType token_type;
+#ifndef SWIG
   union {
     HBytes bytes;
     int64_t sint;
@@ -79,6 +94,9 @@ typedef struct HParsedToken_ {
     HCountedArray *seq; // a sequence of HParsedToken's
     void *user;
   };
+#else
+  HTokenData token_data;
+#endif
   size_t index;
   char bit_offset;
 } HParsedToken;
@@ -126,6 +144,7 @@ typedef struct HCFChoice_ HCFChoice;
 typedef struct HRVMProg_ HRVMProg;
 typedef struct HParserVtable_ HParserVtable;
 
+// TODO: Make this internal
 typedef struct HParser_ {
   const HParserVtable *vtable;
   HParserBackend backend;
@@ -141,12 +160,23 @@ typedef struct HParserTestcase_ {
   char* output_unambiguous;
 } HParserTestcase;
 
+#ifdef SWIG
+typedef union {
+  const char* actual_results;
+  size_t parse_time;
+} HResultTiming;
+#endif
+
 typedef struct HCaseResult_ {
   bool success;
+#ifndef SWIG
   union {
     const char* actual_results; // on failure, filled in with the results of h_write_result_unamb
     size_t parse_time; // on success, filled in with time for a single parse, in nsec
   };
+#else
+  HResultTiming timestamp;
+#endif
 } HCaseResult;
 
 typedef struct HBackendResults_ {
@@ -176,7 +206,7 @@ typedef struct HBenchmarkResults_ {
   rtype_t name(__VA_ARGS__) attr;					\
   rtype_t name##__m(HAllocator* mm__, __VA_ARGS__) attr
 
-#ifndef HAMMER_INTERNAL__NO_STDARG_H
+#ifndef SWIG
 #define HAMMER_FN_DECL_VARARGS(rtype_t, name, ...)			\
   rtype_t name(__VA_ARGS__, ...);					\
   rtype_t name##__m(HAllocator* mm__, __VA_ARGS__, ...);		\
@@ -194,17 +224,17 @@ typedef struct HBenchmarkResults_ {
   rtype_t name##__a(void *args[]);					\
   rtype_t name##__ma(HAllocator *mm__, void *args[])
 #else
-#define HAMMER_FN_DECL_VARARGS(rtype_t, name, ...)			\
-  rtype_t name(__VA_ARGS__, ...);					\
-  rtype_t name##__m(HAllocator* mm__, __VA_ARGS__, ...);		\
-  rtype_t name##__a(void *args[]);					\
+#define HAMMER_FN_DECL_VARARGS(rtype_t, name, params...)  \
+  rtype_t name(params, ...);				  \
+  rtype_t name##__m(HAllocator* mm__, params, ...);    	  \
+  rtype_t name##__a(void *args[]);			 \
   rtype_t name##__ma(HAllocator *mm__, void *args[])
 
 // Note: this drops the attributes on the floor for the __v versions
-#define HAMMER_FN_DECL_VARARGS_ATTR(attr, rtype_t, name, ...)		\
-  rtype_t name(__VA_ARGS__, ...) attr;					\
-  rtype_t name##__m(HAllocator* mm__, __VA_ARGS__, ...) attr;		\
-  rtype_t name##__a(void *args[]);					\
+#define HAMMER_FN_DECL_VARARGS_ATTR(attr, rtype_t, name, params...)		\
+  rtype_t name(params, ...);				\
+  rtype_t name##__m(HAllocator* mm__, params, ...);       	\
+  rtype_t name##__a(void *args[]);				\
   rtype_t name##__ma(HAllocator *mm__, void *args[])
 #endif // HAMMER_INTERNAL__NO_STDARG_H
 // }}}
@@ -586,7 +616,7 @@ char* h_write_result_unamb(const HParsedToken* tok);
  * Format token to the given output stream. Indent starting at
  * [indent] spaces, with [delta] spaces between levels.
  */
-HAMMER_FN_DECL(void, h_pprint, FILE* stream, const HParsedToken* tok, int indent, int delta);
+void h_pprint(FILE* stream, const HParsedToken* tok, int indent, int delta);
 
 /**
  * Build parse tables for the given parser backend. See the
@@ -630,7 +660,7 @@ HParsedToken *h_act_ignore(const HParseResult *p, void* userdata);
 // {{{ Benchmark functions
 HAMMER_FN_DECL(HBenchmarkResults *, h_benchmark, HParser* parser, HParserTestcase* testcases);
 void h_benchmark_report(FILE* stream, HBenchmarkResults* results);
-void h_benchmark_dump_optimized_code(FILE* stream, HBenchmarkResults* results);
+//void h_benchmark_dump_optimized_code(FILE* stream, HBenchmarkResults* results);
 // }}}
 
 // {{{ Token type registry
