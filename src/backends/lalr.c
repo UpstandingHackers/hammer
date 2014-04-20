@@ -49,8 +49,9 @@ static inline HLRTransition *transition(HArena *arena,
 static void transform_productions(const HLRTable *table, HLREnhGrammar *eg,
                                   size_t x, HCFChoice *xAy)
 {
-  if(xAy->type != HCF_CHOICE)
+  if (xAy->type != HCF_CHOICE) {
     return;
+  }
   // XXX CHARSET?
 
   HArena *arena = eg->arena;
@@ -89,7 +90,7 @@ static HCFChoice *new_enhanced_symbol(HLREnhGrammar *eg, const HCFChoice *sym)
   *esym = *sym;
 
   HHashSet *cs = h_hashtable_get(eg->corr, sym);
-  if(!cs) {
+  if (!cs) {
     cs = h_hashset_new(arena, h_eq_symbol, h_hash_symbol);
     h_hashtable_put(eg->corr, sym, cs);
   }
@@ -151,9 +152,9 @@ static int terminals_put(HStringMap *tmap, const HStringMap *fs, HLRAction *acti
 {
   int ret = 0;
 
-  if(fs->epsilon_branch) {
+  if (fs->epsilon_branch) {
     HLRAction *prev = tmap->epsilon_branch;
-    if(prev && prev != action) {
+    if (prev && prev != action) {
       // conflict
       tmap->epsilon_branch = h_lr_conflict(tmap->arena, prev, action);
       ret = -1;
@@ -162,9 +163,9 @@ static int terminals_put(HStringMap *tmap, const HStringMap *fs, HLRAction *acti
     }
   }
 
-  if(fs->end_branch) {
+  if (fs->end_branch) {
     HLRAction *prev = tmap->end_branch;
-    if(prev && prev != action) {
+    if (prev && prev != action) {
       // conflict
       tmap->end_branch = h_lr_conflict(tmap->arena, prev, action);
       ret = -1;
@@ -176,13 +177,14 @@ static int terminals_put(HStringMap *tmap, const HStringMap *fs, HLRAction *acti
   H_FOREACH(fs->char_branches, void *key, HStringMap *fs_)
     HStringMap *tmap_ = h_hashtable_get(tmap->char_branches, key);
 
-    if(!tmap_) {
+    if (!tmap_) {
       tmap_ = h_stringmap_new(tmap->arena);
       h_hashtable_put(tmap->char_branches, key, tmap_);
     }
 
-    if(terminals_put(tmap_, fs_, action) < 0)
+    if (terminals_put(tmap_, fs_, action) < 0) {
       ret = -1;
+    }
   H_END_FOREACH
 
   return ret;
@@ -197,8 +199,9 @@ static bool match_production(HLREnhGrammar *eg, HCFChoice **p,
   for(; *p && *rhs; p++, rhs++) {
     HLRTransition *t = h_hashtable_get(eg->smap, *p);
     assert(t != NULL);
-    if(!h_eq_symbol(t->symbol, *rhs))
+    if (!h_eq_symbol(t->symbol, *rhs)) {
       return false;
+    }
     state = t->to;
   }
   return (*p == *rhs    // both NULL
@@ -231,18 +234,21 @@ int h_lalr_compile(HAllocator* mm__, HParser* parser, const void* params)
   // build LR(0) table
   // if necessary, resolve conflicts "by conversion to SLR"
 
+  if (!parser->vtable->isValidCF(parser->env)) {
+    return -1;
+  }
   HCFGrammar *g = h_cfgrammar_(mm__, h_desugar_augmented(mm__, parser));
   if(g == NULL)     // backend not suitable (language not context-free)
     return -1;
 
   HLRDFA *dfa = h_lr0_dfa(g);
-  if(dfa == NULL) {     // this should normally not happen
+  if (dfa == NULL) {     // this should normally not happen
     h_cfgrammar_free(g);
     return -1;
   }
 
   HLRTable *table = h_lr0_table(g, dfa);
-  if(table == NULL) {   // this should normally not happen
+  if (table == NULL) {   // this should normally not happen
     h_cfgrammar_free(g);
     return -1;
   }
@@ -282,10 +288,11 @@ int h_lalr_compile(HAllocator* mm__, HParser* parser, const void* params)
         H_FOREACH_KEY(lhss, HCFChoice *lhs)
           assert(lhs->type == HCF_CHOICE);  // XXX could be CHARSET?
 
-          for(HCFSequence **p=lhs->seq; *p; p++) {
+	  for(HCFSequence **p=lhs->seq; *p; p++) {
             HCFChoice **rhs = (*p)->items;
-            if(!match_production(eg, rhs, item->rhs, state))
+            if(!match_production(eg, rhs, item->rhs, state)) {
               continue;
+	    }
 
             // the left-hand symbol's follow set is this production's
             // contribution to the lookahead
@@ -297,11 +304,12 @@ int h_lalr_compile(HAllocator* mm__, HParser* parser, const void* params)
             // for each lookahead symbol, put action into table cell
             if(terminals_put(table->tmap[state], fs, action) < 0)
               inadeq = true;
-        } H_END_FOREACH // enhanced production
+	  } H_END_FOREACH // enhanced production
       H_END_FOREACH  // reducible item
 
-      if(inadeq)
+      if(inadeq) {
         h_slist_push(table->inadeq, (void *)(uintptr_t)state);
+      }
     }
   }
 
@@ -350,7 +358,7 @@ int test_lalr(void)
 
   printf("\n==== G R A M M A R ====\n");
   HCFGrammar *g = h_cfgrammar_(mm__, h_desugar_augmented(mm__, p));
-  if(g == NULL) {
+  if (g == NULL) {
     fprintf(stderr, "h_cfgrammar failed\n");
     return 1;
   }
@@ -358,21 +366,23 @@ int test_lalr(void)
 
   printf("\n==== D F A ====\n");
   HLRDFA *dfa = h_lr0_dfa(g);
-  if(dfa)
+  if (dfa) {
     h_pprint_lrdfa(stdout, g, dfa, 0);
-  else
+  } else {
     fprintf(stderr, "h_lalr_dfa failed\n");
+  }
 
   printf("\n==== L R ( 0 )  T A B L E ====\n");
   HLRTable *table0 = h_lr0_table(g, dfa);
-  if(table0)
+  if (table0) {
     h_pprint_lrtable(stdout, g, table0, 0);
-  else
+  } else {
     fprintf(stderr, "h_lr0_table failed\n");
+  }
   h_lrtable_free(table0);
 
   printf("\n==== L A L R  T A B L E ====\n");
-  if(h_compile(p, PB_LALR, NULL)) {
+  if (h_compile(p, PB_LALR, NULL)) {
     fprintf(stderr, "does not compile\n");
     return 2;
   }
@@ -380,10 +390,10 @@ int test_lalr(void)
 
   printf("\n==== P A R S E  R E S U L T ====\n");
   HParseResult *res = h_parse(p, (uint8_t *)"n-(n-((n)))-n", 13);
-  if(res)
+  if (res) {
     h_pprint(stdout, res->ast, 0, 2);
-  else
+  } else {
     printf("no parse\n");
-
+  }
   return 0;
 }

@@ -80,13 +80,14 @@ HBenchmarkResults *h_benchmark__m(HAllocator* mm__, HParser* parser, HParserTest
     // Step 1: Compile grammar for given parser...
     if (h_compile(parser, backend, NULL) == -1) {
       // backend inappropriate for grammar...
-      fprintf(stderr, "failed\n");
+      fprintf(stderr, "Compiling for %s failed\n", HParserBackendNames[backend]);
       ret->results[backend].compile_success = false;
       ret->results[backend].n_testcases = 0;
       ret->results[backend].failed_testcases = 0;
       ret->results[backend].cases = NULL;
       continue;
     }
+    fprintf(stderr, "Compiled for %s\n", HParserBackendNames[backend]);
     ret->results[backend].compile_success = true;
     int tc_failed = 0;
     // Step 1: verify all test cases.
@@ -103,7 +104,7 @@ HBenchmarkResults *h_benchmark__m(HAllocator* mm__, HParser* parser, HParserTest
       if ((res_unamb == NULL && tc->output_unambiguous != NULL)
 	  || (res_unamb != NULL && strcmp(res_unamb, tc->output_unambiguous) != 0)) {
 	// test case failed...
-	fprintf(stderr, "failed\n");
+	fprintf(stderr, "Parsing with %s failed\n", HParserBackendNames[backend]);
 	// We want to run all testcases, for purposes of generating a
 	// report. (eg, if users are trying to fix a grammar for a
 	// faster backend)
@@ -115,7 +116,7 @@ HBenchmarkResults *h_benchmark__m(HAllocator* mm__, HParser* parser, HParserTest
 
     if (tc_failed > 0) {
       // Can't use this parser; skip to the next
-      fprintf(stderr, "Backend failed testcases; skipping benchmark\n");
+      fprintf(stderr, "%s failed testcases; skipping benchmark\n", HParserBackendNames[backend]);
       continue;
     }
 
@@ -140,6 +141,7 @@ HBenchmarkResults *h_benchmark__m(HAllocator* mm__, HParser* parser, HParserTest
 	time_diff = (ts_end.tv_sec - ts_start.tv_sec) * 1000000000 + (ts_end.tv_nsec - ts_start.tv_nsec);
       } while (time_diff < 100000000);
       ret->results[backend].cases[cur_case].parse_time = (time_diff / count);
+      ret->results[backend].cases[cur_case].length = tc->length;
       cur_case++;
     }
   }
@@ -148,11 +150,16 @@ HBenchmarkResults *h_benchmark__m(HAllocator* mm__, HParser* parser, HParserTest
 
 void h_benchmark_report(FILE* stream, HBenchmarkResults* result) {
   for (size_t i=0; i<result->len; ++i) {
-    fprintf(stream, "Backend %zd ... \n", i);
+    if (result->results[i].cases == NULL) {
+      fprintf(stream, "Skipping %s because grammar did not compile for it\n", HParserBackendNames[i]);
+    } else {
+      fprintf(stream, "Backend %zd (%s) ... \n", i, HParserBackendNames[i]);
+    }
     for (size_t j=0; j<result->results[i].n_testcases; ++j) {
-      if(result->results[i].cases == NULL)
+      if (result->results[i].cases == NULL) {
         continue;
-      fprintf(stream, "Case %zd: %zd ns/parse\n", j,  result->results[i].cases[j].parse_time);
+      }
+      fprintf(stream, "Case %zd: %zd ns/parse, %zd ns/byte\n", j,  result->results[i].cases[j].parse_time, result->results[i].cases[j].parse_time / result->results[i].cases[j].length);
     }
   }
 }

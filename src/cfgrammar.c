@@ -46,11 +46,14 @@ static void collect_geneps(HCFGrammar *grammar);
 
 HCFGrammar *h_cfgrammar(HAllocator* mm__, const HParser *parser)
 {
+  if (!parser->vtable->isValidCF(parser->env)) {
+    return NULL;
+  }
   // convert parser to CFG form ("desugar").
   HCFChoice *desugared = h_desugar(mm__, NULL, parser);
-  if(desugared == NULL)
+  if (desugared == NULL) {
     return NULL;  // -> backend not suitable for this parser
-
+  }
   return h_cfgrammar_(mm__, desugared);
 }
 
@@ -61,7 +64,7 @@ HCFGrammar *h_cfgrammar_(HAllocator* mm__, HCFChoice *desugared)
   // recursively traverse the desugared form and collect all HCFChoices that
   // represent a nonterminal (type HCF_CHOICE or HCF_CHARSET).
   collect_nts(g, desugared);
-  if(h_hashset_empty(g->nts)) {
+  if (h_hashset_empty(g->nts)) {
     // desugared is a terminal. wrap it in a singleton HCF_CHOICE.
     HCFChoice *nt = h_new(HCFChoice, 1);
     nt->type = HCF_CHOICE;
@@ -92,8 +95,9 @@ static void collect_nts(HCFGrammar *grammar, HCFChoice *symbol)
   HCFSequence **s;  // for the rhs (sentential form) of a production
   HCFChoice **x;    // for a symbol in s
 
-  if(h_hashset_present(grammar->nts, symbol))
+  if (h_hashset_present(grammar->nts, symbol)) {
     return;     // already visited, get out
+  }
 
   switch(symbol->type) {
   case HCF_CHAR:
@@ -127,8 +131,9 @@ static void collect_nts(HCFGrammar *grammar, HCFChoice *symbol)
 /* Increase g->kmax if needed, allocating enough first/follow slots. */
 static void ensure_k(HCFGrammar *g, size_t k)
 {
-  if(k <= g->kmax) return;
-
+  if (k <= g->kmax) {
+    return;
+  }
   // NB: we don't actually use first/follow[0] but allocate it anyway
   // so indices of the array correspond neatly to values of k
 
@@ -136,7 +141,7 @@ static void ensure_k(HCFGrammar *g, size_t k)
   HHashTable **first  = h_arena_malloc(g->arena, (k+1)*sizeof(HHashTable *));
   HHashTable **follow = h_arena_malloc(g->arena, (k+1)*sizeof(HHashTable *));
 
-  if(g->kmax > 0) {
+  if (g->kmax > 0) {
     // we are resizing, copy the old tables over
     for(size_t i=0; i<=g->kmax; i++) {
       first[i]  = g->first[i];
@@ -181,8 +186,9 @@ bool h_derives_epsilon_seq(HCFGrammar *g, HCFChoice **s)
 {
   // return true iff all symbols in s derive epsilon
   for(; *s; s++) {
-    if(!h_derives_epsilon(g, *s))
+    if (!h_derives_epsilon(g, *s)) {
       return false;
+    }
   }
   return true;
 }
@@ -190,8 +196,9 @@ bool h_derives_epsilon_seq(HCFGrammar *g, HCFChoice **s)
 /* Populate the geneps member of g; no-op if called multiple times. */
 static void collect_geneps(HCFGrammar *g)
 {
-  if(g->geneps != NULL)
+  if (g->geneps != NULL) {
     return;
+  }
 
   g->geneps = h_hashset_new(g->arena, h_eq_ptr, h_hash_ptr);
   assert(g->geneps != NULL);
@@ -206,15 +213,16 @@ static void collect_geneps(HCFGrammar *g)
     HHashTableEntry *hte;
     for(i=0; i < g->nts->capacity; i++) {
       for(hte = &g->nts->contents[i]; hte; hte = hte->next) {
-        if(hte->key == NULL)
+        if (hte->key == NULL) {
           continue;
+	}
         const HCFChoice *symbol = hte->key;
         assert(symbol->type == HCF_CHOICE);
 
         // this NT derives epsilon if any one of its productions does.
         HCFSequence **p;
         for(p = symbol->seq; *p != NULL; p++) {
-          if(h_derives_epsilon_seq(g, (*p)->items)) {
+          if (h_derives_epsilon_seq(g, (*p)->items)) {
             h_hashset_put(g->geneps, symbol);
             break;
           }
@@ -262,8 +270,9 @@ static void *combine_stringmap(void *v1, const void *v2)
 {
   HStringMap *m1 = v1;
   const HStringMap *m2 = v2;
-  if(!m1)
+  if (!m1) {
     m1 = h_stringmap_new(m2->arena);
+  }
   h_stringmap_update(m1, m2);
 
   return m1;
@@ -272,12 +281,12 @@ static void *combine_stringmap(void *v1, const void *v2)
 /* Note: Does *not* reuse submaps from n in building m. */
 void h_stringmap_update(HStringMap *m, const HStringMap *n)
 {
-  if(n->epsilon_branch)
+  if (n->epsilon_branch) {
     m->epsilon_branch = n->epsilon_branch;
-
-  if(n->end_branch)
+  }
+  if (n->end_branch) {
     m->end_branch = n->end_branch;
-
+  }
   h_hashtable_merge(combine_stringmap, m->char_branches, n->char_branches);
 }
 
@@ -294,24 +303,34 @@ HStringMap *h_stringmap_copy(HArena *a, const HStringMap *m)
  */
 void h_stringmap_replace(HStringMap *m, void *old, void *new)
 {
-  if(!old) {
-    if(m->epsilon_branch) m->epsilon_branch = new;
-    if(m->end_branch)     m->end_branch = new;
+  if (!old) {
+    if (m->epsilon_branch) {
+      m->epsilon_branch = new;
+    }
+    if (m->end_branch) {
+      m->end_branch = new;
+    }
   } else {
-    if(m->epsilon_branch == old) m->epsilon_branch = new;
-    if(m->end_branch == old)     m->end_branch = new;
+    if (m->epsilon_branch == old) {
+      m->epsilon_branch = new;
+    }
+    if (m->end_branch == old) {
+      m->end_branch = new;
+    }
   }
 
   // iterate over m->char_branches
   const HHashTable *ht = m->char_branches;
-  for(size_t i=0; i < ht->capacity; i++) {
-    for(HHashTableEntry *hte = &ht->contents[i]; hte; hte = hte->next) {
-      if(hte->key == NULL)
+  for (size_t i=0; i < ht->capacity; i++) {
+    for (HHashTableEntry *hte = &ht->contents[i]; hte; hte = hte->next) {
+      if (hte->key == NULL) {
         continue;
+      }
 
       HStringMap *m_ = hte->value;
-      if(m_)
+      if (m_) {
         h_stringmap_replace(m_, old, new);
+      }
     }
   }
 }
@@ -319,11 +338,13 @@ void h_stringmap_replace(HStringMap *m, void *old, void *new)
 void *h_stringmap_get(const HStringMap *m, const uint8_t *str, size_t n, bool end)
 {
   for(size_t i=0; i<n; i++) {
-    if(i==n-1 && end && m->end_branch)
+    if (i==n-1 && end && m->end_branch) {
       return m->end_branch;
+    }
     m = h_stringmap_get_char(m, str[i]);
-    if(!m)
+    if (!m) {
       return NULL;
+    }
   }
   return m->epsilon_branch;
 }
@@ -331,7 +352,7 @@ void *h_stringmap_get(const HStringMap *m, const uint8_t *str, size_t n, bool en
 void *h_stringmap_get_lookahead(const HStringMap *m, HInputStream lookahead)
 {
   while(m) {
-    if(m->epsilon_branch) {     // input matched
+    if (m->epsilon_branch) {     // input matched
       // assert: another lookahead would not bring a more specific match.
       //         this is for the table generator to ensure. (LLk)
       return m->epsilon_branch;
@@ -341,7 +362,7 @@ void *h_stringmap_get_lookahead(const HStringMap *m, HInputStream lookahead)
     // reading bits from it does not consume them from the real input.
     uint8_t c = h_read_bits(&lookahead, 8, false);
     
-    if(lookahead.overrun) {     // end of input
+    if (lookahead.overrun) {     // end of input
       // XXX assumption of byte-wise grammar and input
       return m->end_branch;
     }
@@ -377,14 +398,15 @@ const HStringMap *h_first(size_t k, HCFGrammar *g, const HCFChoice *x)
   uint8_t c;
 
   // shortcut: first_0(X) is always {""}
-  if(k==0)
+  if (k==0) {
     return g->singleton_epsilon;
-
+  }
   // memoize via g->first
   ensure_k(g, k);
   ret = h_hashtable_get(g->first[k], x);
-  if(ret != NULL)
+  if (ret != NULL) {
     return ret;
+  }
   ret = h_stringmap_new(g->arena);
   assert(ret != NULL);
   h_hashtable_put(g->first[k], x, ret);
@@ -399,7 +421,7 @@ const HStringMap *h_first(size_t k, HCFGrammar *g, const HCFChoice *x)
   case HCF_CHARSET:
     c=0;
     do {
-      if(charset_isset(x->charset, c)) {
+      if (charset_isset(x->charset, c)) {
         h_stringmap_put_char(ret, c, INSET);
       }
     } while(c++ < 255);
@@ -432,9 +454,9 @@ static void stringset_extend(HCFGrammar *g, HStringMap *ret,
 const HStringMap *h_first_seq(size_t k, HCFGrammar *g, HCFChoice **s)
 {
   // shortcut: the first set of the empty sequence, for any k, is {""}
-  if(*s == NULL)
+  if (*s == NULL) {
     return g->singleton_epsilon;
-
+  }
   // first_k(X tail) = { a b | a <- first_k(X), b <- first_l(tail), l=k-|a| }
 
   HCFChoice *x = s[0];
@@ -443,12 +465,14 @@ const HStringMap *h_first_seq(size_t k, HCFGrammar *g, HCFChoice **s)
   const HStringMap *first_x = h_first(k, g, x);
 
   // shortcut: if first_k(X) = {""}, just return first_k(tail)
-  if(is_singleton_epsilon(first_x))
+  if (is_singleton_epsilon(first_x)) {
     return h_first_seq(k, g, tail);
+  }
 
   // shortcut: if no elements of first_k(X) have length <k, just return first_k(X)
-  if(!any_string_shorter(k, first_x))
+  if (!any_string_shorter(k, first_x)) {
     return first_x;
+  }
 
   // create a new result set and build up the set described above
   HStringMap *ret = h_stringmap_new(g->arena);
@@ -468,23 +492,25 @@ static bool is_singleton_epsilon(const HStringMap *m)
 
 static bool any_string_shorter(size_t k, const HStringMap *m)
 {
-  if(k==0)
+  if (k==0) {
     return false;
-
-  if(m->epsilon_branch)
+  }
+  if (m->epsilon_branch) {
     return true;
-
+  }
   // iterate over m->char_branches
   const HHashTable *ht = m->char_branches;
-  for(size_t i=0; i < ht->capacity; i++) {
-    for(HHashTableEntry *hte = &ht->contents[i]; hte; hte = hte->next) {
-      if(hte->key == NULL)
+  for (size_t i=0; i < ht->capacity; i++) {
+    for (HHashTableEntry *hte = &ht->contents[i]; hte; hte = hte->next) {
+      if (hte->key == NULL) {
         continue;
+      }
       HStringMap *m_ = hte->value;
 
       // check subtree for strings shorter than k-1
-      if(any_string_shorter(k-1, m_))
+      if (any_string_shorter(k-1, m_)) {
         return true;
+      }
     }
   }
 
@@ -494,16 +520,21 @@ static bool any_string_shorter(size_t k, const HStringMap *m)
 // helper for h_predict
 static void remove_all_shorter(size_t k, HStringMap *m)
 {
-  if(k==0) return;
+  if (k==0) {
+    return;
+  }
   m->epsilon_branch = NULL;
-  if(k==1) return;
+  if (k==1) {
+    return;
+  }
 
   // iterate over m->char_branches
   const HHashTable *ht = m->char_branches;
-  for(size_t i=0; i < ht->capacity; i++) {
-    for(HHashTableEntry *hte = &ht->contents[i]; hte; hte = hte->next) {
-      if(hte->key == NULL)
+  for (size_t i=0; i < ht->capacity; i++) {
+    for (HHashTableEntry *hte = &ht->contents[i]; hte; hte = hte->next) {
+      if (hte->key == NULL) {
         continue;
+      }
       remove_all_shorter(k-1, hte->value);      // recursion into subtree
     }
   }
@@ -530,39 +561,41 @@ const HStringMap *h_follow(size_t k, HCFGrammar *g, const HCFChoice *x)
   HStringMap *ret;
 
   // shortcut: follow_0(X) is always {""}
-  if(k==0)
+  if (k==0) {
     return g->singleton_epsilon;
-
+  }
   // memoize via g->follow
   ensure_k(g, k);
   ret = h_hashtable_get(g->follow[k], x);
-  if(ret != NULL)
+  if (ret != NULL) {
     return ret;
+  }
   ret = h_stringmap_new(g->arena);
   assert(ret != NULL);
   h_hashtable_put(g->follow[k], x, ret);
 
   // if X is the start symbol, the end token is in its follow set
-  if(x == g->start)
+  if (x == g->start) {
     h_stringmap_put_end(ret, INSET);
-
+  }
   // iterate over g->nts
   size_t i;
   HHashTableEntry *hte;
-  for(i=0; i < g->nts->capacity; i++) {
-    for(hte = &g->nts->contents[i]; hte; hte = hte->next) {
-      if(hte->key == NULL)
+  for (i=0; i < g->nts->capacity; i++) {
+    for (hte = &g->nts->contents[i]; hte; hte = hte->next) {
+      if (hte->key == NULL) {
         continue;
+      }
       HCFChoice *a = (void *)hte->key;      // production's left-hand symbol
       assert(a->type == HCF_CHOICE);
 
       // iterate over the productions for A
       HCFSequence **p;
-      for(p=a->seq; *p; p++) {
+      for (p=a->seq; *p; p++) {
         HCFChoice **s = (*p)->items;        // production's right-hand side
         
-        for(; *s; s++) {
-          if(*s == x) { // occurance found
+        for (; *s; s++) {
+          if (*s == x) { // occurance found
             HCFChoice **tail = s+1;
 
             const HStringMap *first_tail = h_first_seq(k, g, tail);
@@ -604,12 +637,12 @@ static void stringset_extend(HCFGrammar *g, HStringMap *ret,
                              size_t k, const HStringMap *as,
                              StringSetFun f, HCFChoice **tail)
 {
-  if(as->epsilon_branch) {
+  if (as->epsilon_branch) {
     // for a="", add f_k(tail) to ret
     h_stringmap_update(ret, f(k, g, tail));
   }
 
-  if(as->end_branch) {
+  if (as->end_branch) {
     // for a="$", nothing can follow; just add "$" to ret
     // NB: formally, "$" is considered to be of length k
     h_stringmap_put_end(ret, INSET);
@@ -619,8 +652,9 @@ static void stringset_extend(HCFGrammar *g, HStringMap *ret,
   const HHashTable *ht = as->char_branches;
   for(size_t i=0; i < ht->capacity; i++) {
     for(HHashTableEntry *hte = &ht->contents[i]; hte; hte = hte->next) {
-      if(hte->key == NULL)
+      if (hte->key == NULL) {
         continue;
+      }
       uint8_t c = key_char((HCharKey)hte->key);
       
       // follow the branch to find the set { a' | t a' <- as }
@@ -648,7 +682,7 @@ void h_pprint_char(FILE *f, char c)
   case '\n': fputs("\\n", f); break;
   case '\r': fputs("\\r", f); break;
   default:
-    if(isprint((int)c)) {
+    if (isprint((int)c)) {
       fputc(c, f);
     } else {
       fprintf(f, "\\x%.2X", c);
@@ -672,11 +706,11 @@ static void pprint_charset(FILE *f, const HCharset cs)
 
   fputc('[', f);
   for(i=0; i<256; i++) {
-    if(charset_isset(cs, i)) {
+    if (charset_isset(cs, i)) {
       pprint_charset_char(f, i);
 
       // detect ranges
-      if(i+2<256 && charset_isset(cs, i+1) && charset_isset(cs, i+2)) {
+      if (i+2<256 && charset_isset(cs, i+1) && charset_isset(cs, i+2)) {
         fputc('-', f);
         for(; i<256 && charset_isset(cs, i); i++);
         i--;  // back to the last in range
@@ -708,8 +742,9 @@ static HCFChoice **pprint_string(FILE *f, HCFChoice **x)
 {
   fputc('"', f);
   for(; *x; x++) {
-    if((*x)->type != HCF_CHAR)
+    if ((*x)->type != HCF_CHAR) {
       break;
+    }
     h_pprint_char(f, (*x)->chr);
   }
   fputc('"', f);
@@ -739,13 +774,14 @@ void h_pprint_sequence(FILE *f, const HCFGrammar *g, const HCFSequence *seq)
 {
   HCFChoice **x = seq->items;
 
-  if(*x == NULL) {  // the empty sequence
+  if (*x == NULL) {  // the empty sequence
     fputs("\"\"", f);
   } else {
     while(*x) {
-      if(x != seq->items) fputc(' ', f); // internal separator
-
-      if((*x)->type == HCF_CHAR) {
+      if (x != seq->items) {
+	fputc(' ', f); // internal separator
+      }
+      if ((*x)->type == HCF_CHAR) {
         // condense character strings
         x = pprint_string(f, x);
       } else {
@@ -781,7 +817,9 @@ static void pprint_ntrules(FILE *f, const HCFGrammar *g, const HCFChoice *nt,
 
   assert(nt->type == HCF_CHOICE);
   HCFSequence **p = nt->seq;
-  if(*p == NULL) return;          // shouldn't happen
+  if (*p == NULL) {
+    return;          // shouldn't happen
+  }
   pprint_sequence(f, g, *p++);    // print first production on the same line
   for(; *p; p++) {                // print the rest below with "or" bars
     for(i=0; i<column; i++) fputc(' ', f);    // indent
@@ -792,8 +830,9 @@ static void pprint_ntrules(FILE *f, const HCFGrammar *g, const HCFChoice *nt,
 
 void h_pprint_grammar(FILE *file, const HCFGrammar *g, int indent)
 {
-  if(g->nts->used < 1)
+  if (g->nts->used < 1) {
     return;
+  }
 
   // determine maximum string length of symbol names
   int len;
@@ -805,8 +844,9 @@ void h_pprint_grammar(FILE *file, const HCFGrammar *g, int indent)
   HHashTableEntry *hte;
   for(i=0; i < g->nts->capacity; i++) {
     for(hte = &g->nts->contents[i]; hte; hte = hte->next) {
-      if(hte->key == NULL)
+      if (hte->key == NULL) {
         continue;
+      }
       const HCFChoice *a = hte->key;        // production's left-hand symbol
       assert(a->type == HCF_CHOICE);
 
@@ -828,10 +868,12 @@ void h_pprint_symbolset(FILE *file, const HCFGrammar *g, const HHashSet *set, in
   const HCFChoice *a = NULL;
   for(i=0; i < set->capacity; i++) {
     for(hte = &set->contents[i]; hte; hte = hte->next) {
-      if(hte->key == NULL)
+      if (hte->key == NULL) {
         continue;
-      if(a != NULL) // we're not on the first element
+      }
+      if(a != NULL) { // we're not on the first element
           fputc(',', file);
+      }
 
       a = hte->key;        // production's left-hand symbol
 
@@ -851,9 +893,12 @@ pprint_stringmap_elems(FILE *file, bool first, char *prefix, size_t n, char sep,
 {
   assert(n < BUFSIZE-4);
 
-  if(map->epsilon_branch) {
-    if(!first) fputc(sep, file); first=false;
-    if(n==0) {
+  if (map->epsilon_branch) {
+    if (!first) {
+      fputc(sep, file); 
+      first=false;
+    }
+    if (n==0) {
       fputs("\"\"", file);
     } else {
       fputs("\"", file);
@@ -861,20 +906,27 @@ pprint_stringmap_elems(FILE *file, bool first, char *prefix, size_t n, char sep,
       fputs("\"", file);
     }
 
-    if(valprint) {
+    if (valprint) {
       fputc(':', file);
       valprint(file, env, map->epsilon_branch);
     }
   }
 
-  if(map->end_branch) {
-    if(!first) fputs(",\"", file); first=false;
-    if(n>0) fputs("\"\"", file);
+  if (map->end_branch) {
+    if (!first) {
+      fputs(",\"", file); 
+      first=false;
+    }
+    if (n>0) {
+      fputs("\"\"", file);
+    }
     fwrite(prefix, 1, n, file);
-    if(n>0) fputs("\"\"", file);
+    if (n>0) {
+      fputs("\"\"", file);
+    }
     fputs("$", file);
 
-    if(valprint) {
+    if (valprint) {
       fputc(':', file);
       valprint(file, env, map->end_branch);
     }
@@ -886,8 +938,9 @@ pprint_stringmap_elems(FILE *file, bool first, char *prefix, size_t n, char sep,
   HHashTableEntry *hte;
   for(i=0; i < ht->capacity; i++) {
     for(hte = &ht->contents[i]; hte; hte = hte->next) {
-      if(hte->key == NULL)
+      if (hte->key == NULL) {
         continue;
+      }
       uint8_t c = key_char((HCharKey)hte->key);
       HStringMap *ends = hte->value;
 
@@ -901,10 +954,11 @@ pprint_stringmap_elems(FILE *file, bool first, char *prefix, size_t n, char sep,
       case '\n': prefix[n_++] = '\\'; prefix[n_++] = 'n'; break;
       case '\r': prefix[n_++] = '\\'; prefix[n_++] = 'r'; break;
       default:
-        if(isprint(c))
+        if (isprint(c)) {
           prefix[n_++] = c;
-        else
+	} else {
           n_ += sprintf(prefix+n_, "\\x%.2X", c);
+	}
       }
 
       first = pprint_stringmap_elems(file, first, prefix, n_,

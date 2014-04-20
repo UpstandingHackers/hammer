@@ -35,10 +35,12 @@ HParseResult *run_trace(HAllocator *mm__, HRVMProg *orig_prog, HRVMTrace *trace,
 
 HRVMTrace *invert_trace(HRVMTrace *trace) {
   HRVMTrace *last = NULL;
-  if (!trace)
+  if (!trace) {
     return NULL;
-  if (!trace->next)
+  }
+  if (!trace->next) {
     return trace;
+  }
   do {
     HRVMTrace *next = trace->next;
     trace->next = last;
@@ -83,8 +85,9 @@ void* h_rvm_run__m(HAllocator *mm__, HRVMProg *prog, const uint8_t* input, size_
       h_sarray_clear(heads_n);
     }
     memset(insn_seen, 0, prog->length); // no insns seen yet
-    if (!live_threads)
+    if (!live_threads) {
       goto match_fail;
+    }
     live_threads = 0;
     HRVMTrace *tr_head;
     H_SARRAY_FOREACH_KV(tr_head,ip_s,heads_p) {
@@ -111,8 +114,9 @@ void* h_rvm_run__m(HAllocator *mm__, HRVMProg *prog, const uint8_t* input, size_
 	  hi = (arg >> 8) & 0xff;
 	  lo = arg & 0xff;
 	  THREAD.ip++;
-	  if (ch < lo || ch > hi)
-	    ipq_top--; // terminate thread
+	  if (ch < lo || ch > hi) {
+	    ipq_top--; // terminate thread 
+	  }
 	  goto next_insn;
 	case RVM_GOTO:
 	  THREAD.ip = arg;
@@ -141,8 +145,9 @@ void* h_rvm_run__m(HAllocator *mm__, HRVMProg *prog, const uint8_t* input, size_
 	  goto next_insn;
 	case RVM_EOF:
 	  THREAD.ip++;
-	  if (off != len)
+	  if (off != len) {
 	    ipq_top--; // Terminate thread
+	  }
 	  goto next_insn;
 	case RVM_STEP:
 	  // save thread
@@ -249,8 +254,9 @@ HParseResult *run_trace(HAllocator *mm__, HRVMProg *orig_prog, HRVMTrace *trace,
 
 uint16_t h_rvm_create_action(HRVMProg *prog, HSVMActionFunc action_func, void* env) {
   for (uint16_t i = 0; i < prog->action_count; i++) {
-    if (prog->actions[i].action == action_func && prog->actions[i].env == env)
+    if (prog->actions[i].action == action_func && prog->actions[i].env == env) {
       return i;
+    }
   }
   // Ensure that there's room in the action array...
   if (!(prog->action_count & (prog->action_count + 1))) {
@@ -294,8 +300,9 @@ void h_rvm_patch_arg(HRVMProg *prog, uint16_t ip, uint16_t new_val) {
 size_t h_svm_count_to_mark(HSVMContext *ctx) {
   size_t ctm;
   for (ctm = 0; ctm < ctx->stack_count; ctm++) {
-    if (ctx->stack[ctx->stack_count - 1 - ctm]->token_type == TT_MARK)
+    if (ctx->stack[ctx->stack_count - 1 - ctm]->token_type == TT_MARK) {
       return ctm;
+    }
   }
   return ctx->stack_count;
 }
@@ -320,8 +327,10 @@ bool h_svm_action_make_sequence(HArena *arena, HSVMContext *ctx, void* env) {
 }
 
 bool h_svm_action_clear_to_mark(HArena *arena, HSVMContext *ctx, void* env) {
-  while (ctx->stack_count > 0) {    if (ctx->stack[--ctx->stack_count]->token_type == TT_MARK)
+  while (ctx->stack_count > 0) {
+    if (ctx->stack[--ctx->stack_count]->token_type == TT_MARK) {
       return true;
+    }
   }
   return false; // no mark found.
 }
@@ -343,8 +352,9 @@ static void h_regex_free(HParser *parser) {
 }
 
 static int h_regex_compile(HAllocator *mm__, HParser* parser, const void* params) {
-  if (!parser->vtable->isValidRegular(parser->env))
-    return 1;
+  if (!parser->vtable->isValidRegular(parser->env)) {
+    return -1;
+  }
   HRVMProg *prog = h_new(HRVMProg, 1);
   prog->length = prog->action_count = 0;
   prog->insns = NULL;

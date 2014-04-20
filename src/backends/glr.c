@@ -9,6 +9,9 @@ static bool glr_step(HParseResult **result, HSlist *engines,
 
 int h_glr_compile(HAllocator* mm__, HParser* parser, const void* params)
 {
+  if (!parser->vtable->isValidCF(parser->env)) {
+    return -1;
+  }
   int result = h_lalr_compile(mm__, parser, params);
 
   if(result == -1 && parser->backend_data) {

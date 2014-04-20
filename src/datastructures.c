@@ -157,30 +157,67 @@ void* h_hashtable_get(const HHashTable* ht, const void* key) {
   for (hte = &ht->contents[hashval & (ht->capacity - 1)];
        hte != NULL;
        hte = hte->next) {
-    if (hte->key == NULL)
+    if (hte->key == NULL) {
       continue;
-    if (hte->hashval != hashval)
+    }
+    if (hte->hashval != hashval) {
       continue;
-    if (ht->equalFunc(key, hte->key))
+    }
+    if (ht->equalFunc(key, hte->key)) {
       return hte->value;
+    }
   }
   return NULL;
 }
 
+void h_hashtable_put_raw(HHashTable* ht, HHashTableEntry* new_entry);
+
+void h_hashtable_ensure_capacity(HHashTable* ht, size_t n) {
+  bool do_resize = false;
+  size_t old_capacity = ht->capacity;
+  while (n * 1.3 > ht->capacity) {
+    ht->capacity *= 2;
+    do_resize = true;
+  }
+  if (!do_resize)
+    return;
+  HHashTableEntry *old_contents = ht->contents;
+  HHashTableEntry *new_contents = h_arena_malloc(ht->arena, sizeof(HHashTableEntry) * ht->capacity);
+  ht->contents = new_contents;
+  ht->used = 0;
+  memset(new_contents, 0, sizeof(HHashTableEntry) * ht->capacity);
+  for (size_t i = 0; i < old_capacity; ++i)
+    for (HHashTableEntry *entry = &old_contents[i];
+	 entry;
+	 entry = entry->next)
+      if (entry->key)
+	h_hashtable_put_raw(ht, entry);
+  //h_arena_free(ht->arena, old_contents);
+}
+
 void h_hashtable_put(HHashTable* ht, const void* key, void* value) {
   // # Start with a rebalancing
-  //h_hashtable_ensure_capacity(ht, ht->used + 1);
+  h_hashtable_ensure_capacity(ht, ht->used + 1);
 
   HHashValue hashval = ht->hashFunc(key);
+  HHashTableEntry entry = {
+    .key = key,
+    .value = value,
+    .hashval = hashval
+  };
+  h_hashtable_put_raw(ht, &entry);
+}
+ 
+void h_hashtable_put_raw(HHashTable* ht, HHashTableEntry *new_entry) {
 #ifdef CONSISTENCY_CHECK
   assert((ht->capacity & (ht->capacity - 1)) == 0); // capacity is a power of 2
 #endif
 
-  HHashTableEntry *hte = &ht->contents[hashval & (ht->capacity - 1)];
+  HHashTableEntry *hte = &ht->contents[new_entry->hashval & (ht->capacity - 1)];
   if (hte->key != NULL) {
     for(;;) {
       // check each link, stay on last if not found
-      if (hte->hashval == hashval && ht->equalFunc(key, hte->key))
+      if (hte->hashval == new_entry->hashval && ht->equalFunc(new_entry->key, hte->key))
 	goto insert_here;
       if (hte->next == NULL)
         break;
@@ -196,9 +233,9 @@ void h_hashtable_put(HHashTable* ht, const void* key, void* value) {
     ht->used++;
 
  insert_here:
-  hte->key = key;
-  hte->value = value;
-  hte->hashval = hashval;
+  hte->key = new_entry->key;
+  hte->value = new_entry->value;
+  hte->hashval = new_entry->hashval;
 }
 
 void h_hashtable_update(HHashTable *dst, const HHashTable *src) {
