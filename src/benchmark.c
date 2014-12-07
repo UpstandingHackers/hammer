@@ -14,6 +14,14 @@
 #include <sys/resource.h>
 #endif
 
+static const char* HParserBackendNames[] = {
+  "Packrat",
+  "Regular",
+  "LL(k)",
+  "LALR",
+  "GLR"
+};
+
 void h_benchmark_clock_gettime(struct timespec *ts) {
   if (ts == NULL)
     return;

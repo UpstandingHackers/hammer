@@ -46,14 +46,6 @@ typedef enum HParserBackend_ {
   PB_MAX = PB_GLR
 } HParserBackend;
 
-static const char* HParserBackendNames[] = { 
-  "Packrat",
-  "Regular",
-  "LL(k)",
-  "LALR",
-  "GLR"
-};
-
 typedef enum HTokenType_ {
   // Before you change the explicit values of these, think of the poor bindings ;_;
   TT_NONE = 1,
