@@ -18,6 +18,7 @@
 #ifndef HAMMER_ALLOCATOR__H__
 #define HAMMER_ALLOCATOR__H__
 #include <sys/types.h>
+#include "export.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,24 +33,24 @@ typedef struct HAllocator_ {
 
 typedef struct HArena_ HArena ; // hidden implementation
 
-HArena *h_new_arena(HAllocator* allocator, size_t block_size); // pass 0 for default...
+H_EXPORT HArena *h_new_arena(HAllocator* allocator, size_t block_size); // pass 0 for default...
 #ifndef SWIG
-void* h_arena_malloc(HArena *arena, size_t count) __attribute__(( malloc, alloc_size(2) ));
+H_EXPORT void* h_arena_malloc(HArena *arena, size_t count) __attribute__(( malloc, alloc_size(2) ));
 #else
-void* h_arena_malloc(HArena *arena, size_t count);
+H_EXPORT void* h_arena_malloc(HArena *arena, size_t count);
 #endif
-void h_arena_free(HArena *arena, void* ptr); // For future expansion, with alternate memory managers.
-void h_delete_arena(HArena *arena);
+H_EXPORT void h_arena_free(HArena *arena, void* ptr); // For future expansion, with alternate memory managers.
+H_EXPORT void h_delete_arena(HArena *arena);
 
 typedef struct {
   size_t used;
   size_t wasted;
 } HArenaStats;
 
-void h_allocator_stats(HArena *arena, HArenaStats *stats);
+H_EXPORT void h_allocator_stats(HArena *arena, HArenaStats *stats);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // #ifndef LIB_ALLOCATOR__H__
+#endif // #ifndef HAMMER_ALLOCATOR__H__

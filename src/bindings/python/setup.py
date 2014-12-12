@@ -20,8 +20,9 @@ setup(name="hammer",
                              swig_opts=['-DHAMMER_INTERNAL__NO_STDARG_H',
                                         '-I../../'],
                              define_macros=[('SWIG', None)],
-                             depends=['allocator.h', 
-                                      'glue.h', 
+                             depends=['allocator.h',
+                                      'export.h',
+                                      'glue.h',
                                       'hammer.h',
                                       'internal.h',],
                              extra_compile_args=['-fPIC',
@@ -29,7 +30,7 @@ setup(name="hammer",
                              include_dirs=['../../'],
                              library_dirs=['../../'],
                              libraries=['hammer'],)],
-      
+
       py_modules=['hammer'],
 )
 

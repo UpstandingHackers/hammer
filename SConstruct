@@ -45,7 +45,7 @@ env['backendsincpath'] = calcInstallPath("$prefix", "include", "hammer", "backen
 env['pkgconfigpath'] = calcInstallPath("$prefix", "lib", "pkgconfig")
 env.ScanReplace('libhammer.pc.in')
 
-env.MergeFlags("-std=gnu99 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-attributes -Wno-unused-variable")
+env.MergeFlags("-std=gnu99 -fvisibility=hidden -Wall -Wextra -Werror -Wno-unused-parameter -Wno-attributes -Wno-unused-variable")
 
 if env['PLATFORM'] == 'darwin':
     env.Append(SHLINKFLAGS = '-install_name ' + env["libpath"] + '/${TARGET.file}')

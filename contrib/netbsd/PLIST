@@ -4,6 +4,7 @@ include/hammer/allocator.h
 include/hammer/parsers/parser_internal.h
 include/hammer/backends/regex.h
 include/hammer/backends/contextfree.h
+include/hammer/export.h
 include/hammer/glue.h
 include/hammer/hammer.h
 lib/libhammer.so

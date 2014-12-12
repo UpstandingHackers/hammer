@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "allocator.h"
+#include "export.h"
 
 #define BYTE_BIG_ENDIAN 0x1
 #define BIT_BIG_ENDIAN 0x2
@@ -197,47 +198,47 @@ typedef struct HBenchmarkResults_ {
 
 // {{{ Preprocessor definitions
 #define HAMMER_FN_DECL_NOARG(rtype_t, name)		\
-  rtype_t name(void);					\
-  rtype_t name##__m(HAllocator* mm__)
+  H_EXPORT rtype_t name(void);					\
+  H_EXPORT rtype_t name##__m(HAllocator* mm__)
 
 #define HAMMER_FN_DECL(rtype_t, name, ...)		\
-  rtype_t name(__VA_ARGS__);				\
-  rtype_t name##__m(HAllocator* mm__, __VA_ARGS__)
+  H_EXPORT rtype_t name(__VA_ARGS__);				\
+  H_EXPORT rtype_t name##__m(HAllocator* mm__, __VA_ARGS__)
 
 #define HAMMER_FN_DECL_ATTR(attr, rtype_t, name, ...)			\
-  rtype_t name(__VA_ARGS__) attr;					\
-  rtype_t name##__m(HAllocator* mm__, __VA_ARGS__) attr
+  H_EXPORT rtype_t name(__VA_ARGS__) attr;					\
+  H_EXPORT rtype_t name##__m(HAllocator* mm__, __VA_ARGS__) attr
 
 #ifndef SWIG
 #define HAMMER_FN_DECL_VARARGS(rtype_t, name, ...)			\
-  rtype_t name(__VA_ARGS__, ...);					\
-  rtype_t name##__m(HAllocator* mm__, __VA_ARGS__, ...);		\
-  rtype_t name##__mv(HAllocator* mm__, __VA_ARGS__, va_list ap);	\
-  rtype_t name##__v(__VA_ARGS__, va_list ap);				\
-  rtype_t name##__a(void *args[]);					\
-  rtype_t name##__ma(HAllocator *mm__, void *args[])
+  H_EXPORT rtype_t name(__VA_ARGS__, ...);					\
+  H_EXPORT rtype_t name##__m(HAllocator* mm__, __VA_ARGS__, ...);		\
+  H_EXPORT rtype_t name##__mv(HAllocator* mm__, __VA_ARGS__, va_list ap);	\
+  H_EXPORT rtype_t name##__v(__VA_ARGS__, va_list ap);				\
+  H_EXPORT rtype_t name##__a(void *args[]);					\
+  H_EXPORT rtype_t name##__ma(HAllocator *mm__, void *args[])
 
 // Note: this drops the attributes on the floor for the __v versions
 #define HAMMER_FN_DECL_VARARGS_ATTR(attr, rtype_t, name, ...)		\
-  rtype_t name(__VA_ARGS__, ...) attr;					\
-  rtype_t name##__m(HAllocator* mm__, __VA_ARGS__, ...) attr;		\
-  rtype_t name##__mv(HAllocator* mm__, __VA_ARGS__, va_list ap);	\
-  rtype_t name##__v(__VA_ARGS__, va_list ap);				\
-  rtype_t name##__a(void *args[]);					\
-  rtype_t name##__ma(HAllocator *mm__, void *args[])
+  H_EXPORT rtype_t name(__VA_ARGS__, ...) attr;					\
+  H_EXPORT rtype_t name##__m(HAllocator* mm__, __VA_ARGS__, ...) attr;		\
+  H_EXPORT rtype_t name##__mv(HAllocator* mm__, __VA_ARGS__, va_list ap);	\
+  H_EXPORT rtype_t name##__v(__VA_ARGS__, va_list ap);				\
+  H_EXPORT rtype_t name##__a(void *args[]);					\
+  H_EXPORT rtype_t name##__ma(HAllocator *mm__, void *args[])
 #else
 #define HAMMER_FN_DECL_VARARGS(rtype_t, name, params...)  \
-  rtype_t name(params, ...);				  \
-  rtype_t name##__m(HAllocator* mm__, params, ...);    	  \
-  rtype_t name##__a(void *args[]);			 \
-  rtype_t name##__ma(HAllocator *mm__, void *args[])
+  H_EXPORT rtype_t name(params, ...);				  \
+  H_EXPORT rtype_t name##__m(HAllocator* mm__, params, ...);    	  \
+  H_EXPORT rtype_t name##__a(void *args[]);			 \
+  H_EXPORT rtype_t name##__ma(HAllocator *mm__, void *args[])
 
 // Note: this drops the attributes on the floor for the __v versions
 #define HAMMER_FN_DECL_VARARGS_ATTR(attr, rtype_t, name, params...)		\
-  rtype_t name(params, ...);				\
-  rtype_t name##__m(HAllocator* mm__, params, ...);       	\
-  rtype_t name##__a(void *args[]);				\
-  rtype_t name##__ma(HAllocator *mm__, void *args[])
+  H_EXPORT rtype_t name(params, ...);				\
+  H_EXPORT rtype_t name##__m(HAllocator* mm__, params, ...);       	\
+  H_EXPORT rtype_t name##__a(void *args[]);				\
+  H_EXPORT rtype_t name##__ma(HAllocator *mm__, void *args[])
 #endif // SWIG
 // }}}
 
@@ -673,12 +674,12 @@ HAMMER_FN_DECL(void, h_parse_result_free, HParseResult *result);
  * Format token into a compact unambiguous form. Useful for parser test cases.
  * Caller is responsible for freeing the result.
  */
-char* h_write_result_unamb(const HParsedToken* tok);
+H_EXPORT char* h_write_result_unamb(const HParsedToken* tok);
 /**
  * Format token to the given output stream. Indent starting at
  * [indent] spaces, with [delta] spaces between levels.
  */
-void h_pprint(FILE* stream, const HParsedToken* tok, int indent, int delta);
+H_EXPORT void h_pprint(FILE* stream, const HParsedToken* tok, int indent, int delta);
 
 /**
  * Build parse tables for the given parser backend. See the
@@ -692,48 +693,48 @@ HAMMER_FN_DECL(int, h_compile, HParser* parser, HParserBackend backend, const vo
 /**
  * TODO: Document me
  */
-HBitWriter *h_bit_writer_new(HAllocator* mm__);
+H_EXPORT HBitWriter *h_bit_writer_new(HAllocator* mm__);
 
 /**
  * TODO: Document me
  */
-void h_bit_writer_put(HBitWriter* w, uint64_t data, size_t nbits);
+H_EXPORT void h_bit_writer_put(HBitWriter* w, uint64_t data, size_t nbits);
 
 /**
  * TODO: Document me
  * Must not free [w] until you're done with the result.
  * [len] is in bytes.
  */
-const uint8_t* h_bit_writer_get_buffer(HBitWriter* w, size_t *len);
+H_EXPORT const uint8_t* h_bit_writer_get_buffer(HBitWriter* w, size_t *len);
 
 /**
  * TODO: Document me
  */
-void h_bit_writer_free(HBitWriter* w);
+H_EXPORT void h_bit_writer_free(HBitWriter* w);
 
 // General-purpose actions for use with h_action
 // XXX to be consolidated with glue.h when merged upstream
-HParsedToken *h_act_first(const HParseResult *p, void* userdata);
-HParsedToken *h_act_second(const HParseResult *p, void* userdata);
-HParsedToken *h_act_last(const HParseResult *p, void* userdata);
-HParsedToken *h_act_flatten(const HParseResult *p, void* userdata);
-HParsedToken *h_act_ignore(const HParseResult *p, void* userdata);
+H_EXPORT HParsedToken *h_act_first(const HParseResult *p, void* userdata);
+H_EXPORT HParsedToken *h_act_second(const HParseResult *p, void* userdata);
+H_EXPORT HParsedToken *h_act_last(const HParseResult *p, void* userdata);
+H_EXPORT HParsedToken *h_act_flatten(const HParseResult *p, void* userdata);
+H_EXPORT HParsedToken *h_act_ignore(const HParseResult *p, void* userdata);
 
 // {{{ Benchmark functions
 HAMMER_FN_DECL(HBenchmarkResults *, h_benchmark, HParser* parser, HParserTestcase* testcases);
-void h_benchmark_report(FILE* stream, HBenchmarkResults* results);
+H_EXPORT void h_benchmark_report(FILE* stream, HBenchmarkResults* results);
 //void h_benchmark_dump_optimized_code(FILE* stream, HBenchmarkResults* results);
 // }}}
 
 // {{{ Token type registry
 /// Allocate a new, unused (as far as this function knows) token type.
-HTokenType h_allocate_token_type(const char* name);
+H_EXPORT HTokenType h_allocate_token_type(const char* name);
 
 /// Get the token type associated with name. Returns -1 if name is unkown
-HTokenType h_get_token_type_number(const char* name);
+H_EXPORT HTokenType h_get_token_type_number(const char* name);
 
 /// Get the name associated with token_type. Returns NULL if the token type is unkown
-const char* h_get_token_type_name(HTokenType token_type);
+H_EXPORT const char* h_get_token_type_name(HTokenType token_type);
 // }}}
 
 #ifdef __cplusplus

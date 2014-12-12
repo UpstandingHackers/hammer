@@ -5,6 +5,7 @@ Import('env testruns')
 dist_headers = [
     "hammer.h",
     "allocator.h",
+    "export.h",
     "glue.h",
     "internal.h"
 ]

@@ -77,8 +77,8 @@ all: libhammer.a
 libhammer.a: $(HAMMER_PARTS)
 
 bitreader.o: test_suite.h
-hammer.o: hammer.h
-glue.o: hammer.h glue.h
+hammer.o: hammer.h export.h allocator.h
+glue.o: hammer.h glue.h export.h allocator.h
 
 all: libhammer.a
 
