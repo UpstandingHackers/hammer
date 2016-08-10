@@ -97,7 +97,7 @@ before_install:
   - if [ "$BINDINGS" != "none" ]; then sudo apt-get install -qq swig; fi
   - if [ "$BINDINGS" == "perl" ]; then sudo add-apt-repository ppa:dns/irc -y; sudo apt-get update -qq; sudo apt-get install -qq swig=2.0.8-1irc1~12.04; fi
   - if [ "$BINDINGS" == "python" ]; then sudo apt-get install -qq python-dev; fi
-  - if [ "$BINDINGS" == "dotnet" ]; then sudo add-apt-repository ppa:directhex/monoxide -y; sudo apt-get update -qq; sudo apt-get install -y -qq mono-devel mono-mcs nunit nunit-console; mozroots --import --sync; fi
+  - if [ "$BINDINGS" == "dotnet" ]; then sudo add-apt-repository ppa:directhex/monoxide -y; sudo apt-get update -qq; sudo apt-get install -y -qq mono-devel mono-mcs nunit nunit-console; fi
 install: true
 before_script:
   - if [ "$BINDINGS" == "php" ]; then phpenv config-add src/bindings/php/hammer.ini; fi
