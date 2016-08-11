@@ -206,16 +206,43 @@ bool svm_stack_ensure_cap(HAllocator *mm__, HSVMContext *ctx, size_t addl) {
   return true;
 }
 
+/*
+ * GCC produces the following diagnostic on this function:
+ *
+ *    error: argument 'trace' might be clobbered by 'longjmp' or 'vfork' [-Werror=clobbered]
+ *
+ * However, this is spurious; what is happening is that the trace
+ * argument gets reused to store cur, and GCC doesn't know enough
+ * about setjmp to know that the second return only returns nonzero
+ * (and therefore the now-clobbered value of trace is invalid.)
+ *
+ * A side effect of disabling this warning is that we need to be
+ * careful about undefined behaviour involving automatic
+ * variables. Specifically, any automatic variable in this function
+ * whose value gets modified after setjmp has an undefined value after
+ * the second return; here, the only variables that could matter for
+ * are arena and ctx (because they're referenced in "goto fail").
+ */
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wclobbered"
+#endif
 HParseResult *run_trace(HAllocator *mm__, HRVMProg *orig_prog, HRVMTrace *trace, const uint8_t *input, int len) {
   // orig_prog is only used for the action table
-  HSVMContext ctx;
+  HSVMContext *ctx = NULL;
   HArena *arena = h_new_arena(mm__, 0);
-  ctx.stack_count = 0;
-  ctx.stack_capacity = 16;
-  ctx.stack = h_new(HParsedToken*, ctx.stack_capacity);
+  if (arena == NULL) {
+    return NULL;
+  }
+  ctx = h_new(HSVMContext, 1);
+  if (!ctx) goto fail;
+  ctx->stack_count = 0;
+  ctx->stack_capacity = 16;
+  ctx->stack = h_new(HParsedToken*, ctx->stack_capacity);
 
   // out of memory handling
-  if(!arena || !ctx.stack)
+  if(!arena || !ctx->stack)
     goto fail;
   jmp_buf except;
   h_arena_set_except(arena, &except);
@@ -227,20 +254,20 @@ HParseResult *run_trace(HAllocator *mm__, HRVMProg *orig_prog, HRVMTrace *trace,
   for (cur = trace; cur; cur = cur->next) {
     switch (cur->opcode) {
     case SVM_PUSH:
-      if (!svm_stack_ensure_cap(mm__, &ctx, 1)) {
+      if (!svm_stack_ensure_cap(mm__, ctx, 1)) {
 	goto fail;
       }
       tmp_res = a_new(HParsedToken, 1);
       tmp_res->token_type = TT_MARK;
       tmp_res->index = cur->input_pos;
       tmp_res->bit_offset = 0;
-      ctx.stack[ctx.stack_count++] = tmp_res;
+      ctx->stack[ctx->stack_count++] = tmp_res;
       break;
     case SVM_NOP:
       break;
     case SVM_ACTION:
       // Action should modify stack appropriately
-      if (!orig_prog->actions[cur->arg].action(arena, &ctx, orig_prog->actions[cur->arg].env)) {
+      if (!orig_prog->actions[cur->arg].action(arena, ctx, orig_prog->actions[cur->arg].env)) {
 	
 	// action failed... abort somehow
 	goto fail;
@@ -249,9 +276,9 @@ HParseResult *run_trace(HAllocator *mm__, HRVMProg *orig_prog, HRVMTrace *trace,
     case SVM_CAPTURE: 
       // Top of stack must be a mark
       // This replaces said mark in-place with a TT_BYTES.
-      assert(ctx.stack[ctx.stack_count-1]->token_type == TT_MARK);
+      assert(ctx->stack[ctx->stack_count-1]->token_type == TT_MARK);
       
-      tmp_res = ctx.stack[ctx.stack_count-1];
+      tmp_res = ctx->stack[ctx->stack_count-1];
       tmp_res->token_type = TT_BYTES;
       // TODO: Will need to copy if bit_offset is nonzero
       assert(tmp_res->bit_offset == 0);
@@ -260,25 +287,33 @@ HParseResult *run_trace(HAllocator *mm__, HRVMProg *orig_prog, HRVMTrace *trace,
       tmp_res->bytes.len = cur->input_pos - tmp_res->index;
       break;
     case SVM_ACCEPT:
-      assert(ctx.stack_count <= 1);
+      assert(ctx->stack_count <= 1);
       HParseResult *res = a_new(HParseResult, 1);
-      if (ctx.stack_count == 1) {
-	res->ast = ctx.stack[0];
+      if (ctx->stack_count == 1) {
+	res->ast = ctx->stack[0];
       } else {
 	res->ast = NULL;
       }
       res->bit_length = cur->input_pos * 8;
       res->arena = arena;
       h_arena_set_except(arena, NULL);
-      h_free(ctx.stack);
+      h_free(ctx->stack);
+      h_free(ctx);
       return res;
     }
   }
  fail:
   if (arena) h_delete_arena(arena);
-  if (ctx.stack) h_free(ctx.stack);
+  if (ctx) {
+    if (ctx->stack) h_free(ctx->stack);
+    h_free(ctx);
+  }
   return NULL;
 }
+// Reenable -Wclobber
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 uint16_t h_rvm_create_action(HRVMProg *prog, HSVMActionFunc action_func, void* env) {
   for (uint16_t i = 0; i < prog->action_count; i++) {
