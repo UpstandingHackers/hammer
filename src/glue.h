@@ -200,7 +200,7 @@ HParsedToken *h_make_sint(HArena *arena, int64_t val);
 HParsedToken *h_make_uint(HArena *arena, uint64_t val);
 
 // Standard short-hands to make tokens in an action.
-#define H_MAKE(TYP, VAL)  h_make(p->arena, (HTokenType)TT_ ## TYP, VAL)
+#define H_MAKE(TYP, VAL)  h_make(p->arena, (HTokenType) TYP, VAL)
 #define H_MAKE_SEQ()      h_make_seq(p->arena)
 #define H_MAKE_SEQN(N)    h_make_seqn(p->arena, N)
 #define H_MAKE_BYTES(VAL, LEN) h_make_bytes(p->arena, VAL, LEN)
@@ -213,7 +213,7 @@ HParsedToken *h_make_uint(HArena *arena, uint64_t val);
 #define h_assert_type(T,P)  (assert(P->token_type == (HTokenType)T), P)
 
 // Convenience short-hand forms of h_assert_type.
-#define H_ASSERT(TYP, TOK)   h_assert_type(TT_ ## TYP, TOK)
+#define H_ASSERT(TYP, TOK)   h_assert_type(TYP, TOK)
 #define H_ASSERT_SEQ(TOK)    h_assert_type(TT_SEQUENCE, TOK)
 #define H_ASSERT_BYTES(TOK)  h_assert_type(TT_BYTES, TOK)
 #define H_ASSERT_SINT(TOK)   h_assert_type(TT_SINT, TOK)
