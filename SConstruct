@@ -84,7 +84,7 @@ AddOption('--tests',
 env['CC'] = os.getenv('CC') or env['CC']
 env['CXX'] = os.getenv('CXX') or env['CXX']
 
-if os.getenv('CC') == 'clang' or env['PLATFORM'] == 'darwin':
+if os.getenv('CC') == 'clang' or (env['PLATFORM'] == 'darwin' and os.getenv('CC') == None):
     env.Replace(CC='clang',
                 CXX='clang++')
 
@@ -102,7 +102,7 @@ if env['CC'] == 'cl':
         ]
     )
 else:
-    env.MergeFlags('-std=gnu99 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-attributes -Wno-unused-variable')
+    env.MergeFlags('-std=gnu99 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-attributes -Wno-unused-variable -Wno-unknown-warning-option')
 
 # Linker options
 if env['PLATFORM'] == 'darwin':
