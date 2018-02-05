@@ -282,7 +282,6 @@ int start_listening() {
 }
 
 const int TYPE_MAX = 16;
-typedef const char* cstr;
 static const char* TYPE_STR[17] = {
   "nil", "A", "NS", "MD",
   "MF", "CNAME", "SOA", "MB",
