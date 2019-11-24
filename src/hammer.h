@@ -717,6 +717,32 @@ HAMMER_FN_DECL(HParser*, h_get_value, const char* name);
 HAMMER_FN_DECL(HParser*, h_bind, const HParser *p, HContinuation k, void *env);
 
 /**
+ * This parser skips 'n' bits of input.
+ *
+ * Result: None. The HParseResult exists but its AST is NULL.
+ */
+HAMMER_FN_DECL(HParser*, h_skip, size_t n);
+
+/**
+ * The HParser equivalent of fseek(), 'h_seek' modifies the parser's input
+ * position.  Note that contrary to 'fseek', offsets are in bits, not bytes.
+ * The 'whence' argument uses the same values and semantics: SEEK_SET,
+ * SEEK_CUR, SEEK_END.
+ *
+ * Fails if the new input position would be negative or past the end of input.
+ *
+ * Result: TT_UINT. The new input position.
+ */
+HAMMER_FN_DECL(HParser*, h_seek, ssize_t offset, int whence);
+
+/**
+ * Report the current position in bits. Consumes no input.
+ *
+ * Result: TT_UINT. The current input position.
+ */
+HAMMER_FN_DECL_NOARG(HParser*, h_tell);
+
+/**
  * Free the memory allocated to an HParseResult when it is no longer needed.
  */
 HAMMER_FN_DECL(void, h_parse_result_free, HParseResult *result);

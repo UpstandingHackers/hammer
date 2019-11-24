@@ -108,3 +108,77 @@ int64_t h_read_bits(HInputStream* state, int count, char signed_p) {
   out <<= final_shift;
   return (out ^ msb) - msb; // perform sign extension
 }
+
+void h_skip_bits(HInputStream* stream, size_t count) {
+  size_t left;
+
+  if (count == 0)
+    return;
+
+  if (stream->overrun)
+    return;
+
+  if (stream->index == stream->length) {
+    stream->overrun = true;
+    return;
+  }
+
+  // consume from a partial byte?
+  left = 8 - stream->bit_offset - stream->margin;
+  if (count < left) {
+    stream->bit_offset += count;
+    return;
+  }
+  if (left < 8) {
+    stream->index += 1;
+    stream->bit_offset = 0;
+    stream->margin = 0;
+    count -= left;
+  }
+  assert(stream->bit_offset == 0);
+  assert(stream->margin == 0);
+
+  // consume full bytes
+  left = stream->length - stream->index;
+  if (count / 8 <= left) {
+    stream->index += count / 8;
+    count = count % 8;
+  } else {
+    stream->index = stream->length;
+    stream->overrun = true;
+    return;
+  }
+  assert(count < 8);
+
+  // final partial byte
+  if (count > 0 && stream->index == stream->length)
+    stream->overrun = true;
+  else
+    stream->bit_offset = count;
+}
+
+void h_seek_bits(HInputStream* stream, size_t pos) {
+  size_t pos_index = pos / 8;
+  size_t pos_offset = pos % 8;
+
+  /* seek within the current byte? */
+  if (pos_index == stream->index) {
+    stream->bit_offset = pos_offset;
+    return;
+  }
+
+  stream->margin = 0;
+
+  /* seek past the end? */
+  if ((pos_index > stream->length) ||
+      (pos_index == stream->length && pos_offset > 0)) {
+    stream->index = stream->length;
+    stream->bit_offset = 0;
+    stream->overrun = true;
+    return;
+  }
+
+  stream->index = pos_index;
+  stream->bit_offset = pos_offset;
+  stream->margin = 0;
+}

@@ -743,6 +743,70 @@ static void test_bind(gconstpointer backend) {
   g_check_parse_failed(p, be, "272{", 4);
 }
 
+static void test_skip(gconstpointer backend) {
+  HParserBackend be = (HParserBackend)GPOINTER_TO_INT(backend);
+  const HParser *p, *p_le, *p_be;
+
+  p = h_sequence(h_ch('a'), h_skip(32), h_ch('f'), NULL);
+  g_check_parse_match(p, be, "abcdef", 6, "(u0x61 u0x66)");
+  g_check_parse_failed(p, be, "abcdex", 6);
+  g_check_parse_failed(p, be, "abc", 3);
+
+  p = h_sequence(h_ch('a'), h_skip(32), h_end_p(), NULL);
+  g_check_parse_match(p, be, "abcde", 5, "(u0x61)");
+
+  p = h_sequence(h_ch('a'), h_skip(3), h_ch('\0'), h_skip(5), h_ch('b'), NULL);
+  g_check_parse_match(p, be, "a\xe0\x1f\x62", 4, "(u0x61 u0 u0x62)"); // big-endian
+  p_le = h_with_endianness(BYTE_LITTLE_ENDIAN|BIT_LITTLE_ENDIAN, p);
+  p_be = h_with_endianness(BYTE_LITTLE_ENDIAN|BIT_BIG_ENDIAN, p);
+  g_check_parse_match(p_be, be, "a\xe0\x1f\x62", 4, "(u0x61 u0 u0x62)");
+  g_check_parse_match(p_le, be, "a\x07\xf8\x62", 4, "(u0x61 u0 u0x62)");
+
+  p = h_sequence(h_ch('a'), h_skip(3), h_ch('\0'), h_skip(5), h_end_p(), NULL);
+  g_check_parse_match(p, be, "a\xe0\x1f", 3, "(u0x61 u0)"); // big-endian
+}
+
+static void test_tell(gconstpointer backend) {
+  HParserBackend be = (HParserBackend)GPOINTER_TO_INT(backend);
+  const HParser *p;
+
+  p = h_sequence(h_ch('a'), h_ch('b'), h_tell(), h_end_p(), NULL);
+  g_check_parse_match(p, be, "ab", 2, "(u0x61 u0x62 u0x10)");
+  g_check_parse_failed(p, be, "abc", 1);
+  g_check_parse_failed(p, be, "a", 1);
+}
+
+static void test_seek(gconstpointer backend) {
+  HParserBackend be = (HParserBackend)GPOINTER_TO_INT(backend);
+  const HParser *p;
+
+  p = h_sequence(h_ch('a'), h_seek(40, SEEK_SET), h_ch('f'), NULL);
+  g_check_parse_match(p, be, "abcdef", 6, "(u0x61 u0x28 u0x66)");
+  g_check_parse_failed(p, be, "abcdex", 6);
+  g_check_parse_failed(p, be, "abc", 3);
+
+  p = h_sequence(h_ch('a'), h_seek(40, SEEK_SET), h_end_p(), NULL);
+  g_check_parse_match(p, be, "abcde", 5, "(u0x61 u0x28)");
+  g_check_parse_failed(p, be, "abcdex", 6);
+  g_check_parse_failed(p, be, "abc", 3);
+
+  p = h_sequence(h_ch('a'), h_seek(0, SEEK_END), h_end_p(), NULL);
+  g_check_parse_match(p, be, "abcde", 5, "(u0x61 u0x28)");
+  g_check_parse_match(p, be, "abc", 3, "(u0x61 u0x18)");
+
+  p = h_sequence(h_ch('a'), h_seek(-16, SEEK_END), h_ch('x'), NULL);
+  g_check_parse_match(p, be, "abcdxy", 6, "(u0x61 u0x20 u0x78)");
+  g_check_parse_match(p, be, "abxy", 4, "(u0x61 u0x10 u0x78)");
+  g_check_parse_failed(p, be, "abc", 3);
+  g_check_parse_failed(p, be, "x", 1);
+
+  p = h_sequence(h_ch('a'), h_seek(32, SEEK_CUR), h_ch('f'), NULL);
+  g_check_parse_match(p, be, "abcdef", 6, "(u0x61 u0x28 u0x66)");
+  g_check_parse_failed(p, be, "xbcdef", 6);
+  g_check_parse_failed(p, be, "abcdex", 6);
+  g_check_parse_failed(p, be, "abc", 3);
+}
+
 void register_parser_tests(void) {
   g_test_add_data_func("/core/parser/packrat/token", GINT_TO_POINTER(PB_PACKRAT), test_token);
   g_test_add_data_func("/core/parser/packrat/ch", GINT_TO_POINTER(PB_PACKRAT), test_ch);
@@ -795,6 +859,9 @@ void register_parser_tests(void) {
   g_test_add_data_func("/core/parser/packrat/bind", GINT_TO_POINTER(PB_PACKRAT), test_bind);
   g_test_add_data_func("/core/parser/packrat/result_length", GINT_TO_POINTER(PB_PACKRAT), test_result_length);
   //g_test_add_data_func("/core/parser/packrat/token_position", GINT_TO_POINTER(PB_PACKRAT), test_token_position);
+  g_test_add_data_func("/core/parser/packrat/skip", GINT_TO_POINTER(PB_PACKRAT), test_skip);
+  g_test_add_data_func("/core/parser/packrat/seek", GINT_TO_POINTER(PB_PACKRAT), test_seek);
+  g_test_add_data_func("/core/parser/packrat/tell", GINT_TO_POINTER(PB_PACKRAT), test_tell);
 
   g_test_add_data_func("/core/parser/llk/token", GINT_TO_POINTER(PB_LLk), test_token);
   g_test_add_data_func("/core/parser/llk/ch", GINT_TO_POINTER(PB_LLk), test_ch);

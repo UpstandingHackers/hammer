@@ -52,7 +52,8 @@ parsers = ['parsers/%s.c'%s for s in
             'unimplemented',
             'whitespace',
             'xor',
-            'value']]
+            'value',
+            'seek']]
 
 backends = ['backends/%s.c' % s for s in
             ['packrat', 'llk', 'regex', 'glr', 'lalr', 'lr', 'lr0']]
