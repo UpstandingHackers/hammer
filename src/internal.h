@@ -428,6 +428,7 @@ typedef struct HTTEntry_ {
   const char* name;
   HTokenType value;
   void (*unamb_sub)(const HParsedToken *tok, struct result_buf *buf);
+  void (*pprint)(FILE* stream, const HParsedToken* tok, int indent, int delta);
 } HTTEntry;
 
 const HTTEntry* h_get_token_type_entry(HTokenType token_type);

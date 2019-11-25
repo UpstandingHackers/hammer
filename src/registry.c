@@ -54,12 +54,14 @@ static void default_unamb_sub(const HParsedToken* tok,
 
 HTokenType h_allocate_token_new(
     const char* name,
-    void (*unamb_sub)(const HParsedToken *tok, struct result_buf *buf)) {
+    void (*unamb_sub)(const HParsedToken *tok, struct result_buf *buf),
+    void (*pprint)(FILE* stream, const HParsedToken* tok, int indent, int delta)) {
   HTTEntry* new_entry = h_alloc(&system_allocator, sizeof(*new_entry));
   assert(new_entry != NULL);
   new_entry->name = name;
   new_entry->value = 0;
-  new_entry->unamb_sub = unamb_sub;
+  new_entry->unamb_sub = unamb_sub ? unamb_sub : default_unamb_sub;
+  new_entry->pprint = pprint;
   HTTEntry* probe = *(HTTEntry**)tsearch(new_entry, &tt_registry, compare_entries);
   if (probe->value != 0) {
     // Token type already exists...
@@ -86,7 +88,7 @@ HTokenType h_allocate_token_new(
   }
 }
 HTokenType h_allocate_token_type(const char* name) {
-  return h_allocate_token_new(name, default_unamb_sub);
+  return h_allocate_token_new(name, NULL, NULL);
 }
 HTokenType h_get_token_type_number(const char* name) {
   HTTEntry e;

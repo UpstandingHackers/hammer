@@ -728,10 +728,22 @@ HAMMER_FN_DECL(void, h_parse_result_free, HParseResult *result);
  */
 char* h_write_result_unamb(const HParsedToken* tok);
 /**
- * Format token to the given output stream. Indent starting at
- * [indent] spaces, with [delta] spaces between levels.
+ * Format token to the given output stream. Indent starting at [indent] spaces,
+ * with [delta] spaces between levels.
+ *
+ * Note: This function does not print a trailing newline. It also does not
+ * print any spaces to indent the initial line of output. This makes it
+ * suitable for recursive use in the condensed output of larger structures.
  */
 void h_pprint(FILE* stream, const HParsedToken* tok, int indent, int delta);
+/**
+ * Format token to the given output. Print a trailing newline.
+ *
+ * This function assumes an initial indentation of 0 and uses 2 spaces between
+ * indentation levels. It is equivalent to 'h_pprint(stream, tok, 0, 2)'
+ * followed by 'fputc('\n', stream)' and is provided for convenience.
+ */
+void h_pprintln(FILE* stream, const HParsedToken* tok);
 
 /**
  * Build parse tables for the given parser backend. See the
@@ -795,7 +807,8 @@ HTokenType h_allocate_token_type(const char* name);
 /// Allocate a new token type with an unambiguous print function.
 HTokenType h_allocate_token_new(
     const char* name,
-    void (*unamb_sub)(const HParsedToken *tok, struct result_buf *buf));
+    void (*unamb_sub)(const HParsedToken *tok, struct result_buf *buf),
+    void (*pprint)(FILE* stream, const HParsedToken* tok, int indent, int delta));
 
 /// Get the token type associated with name. Returns -1 if name is unkown
 HTokenType h_get_token_type_number(const char* name);
