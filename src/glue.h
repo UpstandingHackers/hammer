@@ -195,7 +195,7 @@ HParsedToken *h_act_ignore(const HParseResult *p, void* user_data);
 HParsedToken *h_make(HArena *arena, HTokenType type, void *value);
 HParsedToken *h_make_seq(HArena *arena);  // Makes empty sequence.
 HParsedToken *h_make_seqn(HArena *arena, size_t n);  // Makes empty sequence of expected size n.
-HParsedToken *h_make_bytes(HArena *arena, uint8_t *array, size_t len);
+HParsedToken *h_make_bytes(HArena *arena, const uint8_t *array, size_t len);
 HParsedToken *h_make_sint(HArena *arena, int64_t val);
 HParsedToken *h_make_uint(HArena *arena, uint64_t val);
 

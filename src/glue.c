@@ -106,7 +106,7 @@ HParsedToken *h_make_seqn(HArena *arena, size_t n)
   return ret;
 }
 
-HParsedToken *h_make_bytes(HArena *arena, uint8_t *array, size_t len)
+HParsedToken *h_make_bytes(HArena *arena, const uint8_t *array, size_t len)
 {
   HParsedToken *ret = h_make_(arena, TT_BYTES);
   ret->bytes.len = len;
