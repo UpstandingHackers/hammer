@@ -34,7 +34,7 @@ HParsedToken* act_domain(const HParseResult *p, void* user_data) {
     for (size_t i=0; i<p->ast->seq->used; ++i) {
       HParsedToken *tmp = p->ast->seq->elements[i];
       for (size_t j=0; j<tmp->seq->used; ++j) {
-	arr[count] = tmp->seq->elements[i]->uint;
+	arr[count] = tmp->seq->elements[j]->uint;
 	++count;
       }
       arr[count] = '.';
